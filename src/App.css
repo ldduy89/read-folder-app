@@ -1,0 +1,508 @@
+.App {
+  text-align: center;
+  cursor: pointer;
+}
+
+.react-player video::cue{
+  font-size: var(--font-size-subtitle);
+  font-weight: 700;
+  font-family: Tahoma;
+  background-color: black;
+  color:gold;
+  position:absolute;
+  top: 1px;
+ }
+ .subtitle-track {
+  width: 50%
+ }
+ 
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+a {
+  color: aliceblue;
+}
+.App-body{
+  width: 1000px;
+  margin: auto;
+  text-align: left;
+  font-size: 20px;
+  margin-top: 0;
+  height: 900px;
+  overflow: auto;
+}
+img {
+  width: 15px;
+  padding-right: 10px;
+  padding-left: 10px;
+  margin-bottom: -3px;
+}
+.App-item {
+  padding: 5px 0px;
+}
+.active a{
+  color: #61dafb;
+}
+.app-title{
+  padding-bottom: 5px;
+}
+.player-wrapper {
+  position: relative;
+  /* padding-top: 36.25% */
+  height: 400px;
+}
+.button-vol {
+  font-size: 20px;
+  padding: 5px 5px;
+  margin: 5px;
+  width: 70px;
+}
+
+.button-next-video {
+  font-size: 20px;
+  padding: 5px 5px;
+  margin: 5px;
+  width: 120px;
+}
+
+.react-player {
+  /* position: absolute; */
+  /* top: 0;
+  left: 0; */
+  /* margin: auto !important;
+  max-width: 100% !important;
+  max-height: 100% !important; */
+  height: 100% !important;
+  width: 100% !important;
+}
+.App-list {
+  padding: 10px;
+  max-height: 600px;
+  overflow-x: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.v-vlite {
+  font-family: Roboto,arial,sans-serif;
+  /* position: relative;
+  height: 0; */
+  /* padding-top: 56.25%; */
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  overflow: hidden;
+}
+.v-vlite, .v-vlite * {
+  box-sizing: border-box;
+}
+
+.v-vlite .v-overlayVideo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 50px);
+}
+.v-vlite a, .v-vlite div, .v-vlite form, .v-vlite label, .v-vlite li, .v-vlite p, .v-vlite span, .v-vlite ul {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  vertical-align: baseline;
+}
+.v-vlite.v-paused .v-controlBar.hidden, .v-vlite.v-paused .v-topBar.hidden {
+  opacity: 1;
+}
+.v-vlite .v-controlBar.hidden, .v-vlite .v-topBar.hidden {
+  opacity: 0;
+}
+.v-playing.nocursor:fullscreen { 
+  cursor: none; 
+  transition: .25s ease-in;
+}
+.v-vlite .v-controlBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--width-bar);
+  padding-top: 3px;
+  text-align: right;
+  padding-left: 10px;
+  padding-right: 10px;
+  background: linear-gradient(0deg,#000,hsla(0,0%,100%,0));
+  transition: .25s ease-in;
+}
+.v-vlite .v-topBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 35px;
+  padding-top: 5px;
+  text-align: right;
+  padding-left: 15px;
+  padding-right: 10px;
+  background: linear-gradient(180deg,#000,hsla(0,0%,100%,0));
+  transition: .25s ease-in;
+  text-align: left;
+}
+.v-vlite .v-topBar span {
+  font-size: 24px;
+}
+.v-vlite .v-progressBar {
+  position: absolute;
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 8px;
+  background-color: rgba(255,255,255,.2);
+  transition: height .1s ease-out,top .1s ease-out;
+  z-index: 1;
+}
+.v-vlite .v-progressBar .v-progressSeek {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(135deg,#ff0053,#ee5b35);
+  border-radius: 0 4px 4px 0;
+  transition: all .1s ease-out;
+}
+
+.v-vlite .v-progressBar .v-progressInput {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
+    opacity: 0;
+}
+
+.v-vlite .v-controlBar .v-controlBarContent {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.v-vlite .v-playPauseButton {
+    position: relative;
+    float: left;
+    width: var(--width-bar);
+    height: 100%;
+    cursor: pointer;
+}
+.v-vlite .v-playPauseButton .v-nextIcon {
+  width: 100%;
+  height: 100%;
+  /* position: absolute;
+  top: 45%;
+  left: 29%;
+  -webkit-transform: translateX(-50%) translateY(-50%);
+  transform: translateX(-50%) translateY(-50%); */
+}
+.v-vlite .v-playPauseButton .v-nextIcon svg {
+  width: 100%;
+  height: 100%;
+}
+.v-vlite .v-playPauseButton .v-previousIcon {
+  width: 100%;
+  height: 100%;
+  /* position: absolute;
+  top: 46%;
+  left: 57%;
+  -webkit-transform: translateX(-50%) translateY(-50%);
+  transform: translateX(-50%) translateY(-50%); */
+}
+.v-vlite .v-playPauseButton .v-previousIcon svg {
+  width: 100%;
+  height: 100%;
+  /* position: absolute;
+  top: 46%;
+  left: 57%;
+  -webkit-transform: translateX(-50%) translateY(-50%);
+  transform: translateX(-50%) translateY(-50%); */
+}
+.v-vlite .v-playPauseButton .v-playerIcon, .v-vlite .v-volume .v-playerIcon {
+  display: none;
+  width: 100%;
+  height: 100%;
+  /* position: absolute;
+  top: 50%;
+  left: 50%;
+  -webkit-transform: translateX(-50%) translateY(-50%);
+  transform: translateX(-50%) translateY(-50%); */
+}
+.v-vlite .v-playPauseButton .v-playerIcon, .v-vlite .v-volume .v-playerIcon svg {
+  width: 100%;
+  height: 100%;
+  /* position: absolute;
+  top: 50%;
+  left: 50%;
+  -webkit-transform: translateX(-50%) translateY(-50%);
+  transform: translateX(-50%) translateY(-50%); */
+}
+
+.v-vlite .v-subtitle .v-subIcon {
+  width: 100%;
+  height: 100%;
+  /* position: absolute;
+  top: 50%;
+  left: 50%;
+  -webkit-transform: translateX(-50%) translateY(-50%);
+  transform: translateX(-50%) translateY(-50%); */
+}
+
+.v-vlite.v-paused .v-playPauseButton .v-iconPlay {
+  display: block;
+}
+.v-vlite.v-paused .v-playPauseButton .v-iconPlay {
+  display: block;
+}
+.v-vlite .v-time {
+  color: #fff;
+  font-size: var(--font-size);
+  float: left;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+.v-vlite .v-volume, .v-vlite .v-subtitle {
+  position: relative;
+  display: inline-block;
+  width: var(--width-bar);
+  height: 100%;
+  cursor: pointer;
+}
+
+.v-vlite .v-fullscreen {
+  position: relative;
+  display: inline-block;
+  width: var(--width-bar);
+  height: 100%;
+  cursor: pointer;
+}
+.v-vlite .v-fullscreen.v-exit .v-iconShrink, .v-vlite .v-fullscreen:not(.v-exit) .v-iconFullscreen {
+  display: block;
+}
+.v-vlite .v-fullscreen .v-playerIcon {
+  display: none;
+  height: 100%;
+  width: 100%;
+  /* position: absolute;
+  top: 50%;
+  left: 50%;
+  -webkit-transform: translateX(-50%) translateY(-50%);
+  transform: translateX(-50%) translateY(-50%); */
+}
+.v-vlite .v-playPauseButton svg {
+  fill: #fff;
+  transition: opacity .25s;
+  opacity: .85;
+}
+
+.v-vlite .v-volume svg, .v-vlite .v-fullscreen svg, .v-vlite .v-subtitle .v-subIcon svg {
+  fill: #fff;
+  transition: opacity .25s;
+  opacity: .85;
+  /* width: 18px;
+  height: 18px; */
+  height: 100%;
+  width: 100%;
+}
+
+
+.vlite-js video {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.v-vlite.v-playing .v-playPauseButton .v-iconPause {
+  display: block;
+}
+.v-vlite .v-fullscreen.v-exit .v-iconShrink, .v-vlite .v-fullscreen:not(.v-exit) .v-iconFullscreen {
+  display: block;
+}
+
+.v-vlite .v-progressBar:hover {
+    height: 12px;
+    top: -1px;
+}
+.v-vlite .v-progressBar.f-active {
+  height: 12px;
+  top: -1px;
+}
+
+.v-vlite .v-volume.v-muted .v-iconVolumeMute, .v-vlite .v-volume:not(.v-muted) .v-iconVolumeHigh {
+  display: block;
+}
+
+.v-subtitlesList.v-active {
+  opacity: 1;
+  visibility: visible;
+}
+.v-subtitlesList {
+  background-color: #fff;
+  border-radius: 5px;
+  bottom: var(--width-bar);
+  left: 50%;
+  opacity: 0;
+  position: absolute;
+  transform: translateX(-50%);
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  visibility: hidden;
+  z-index: 3;
+}
+.v-subtitlesList ul {
+  margin: 0;
+  padding: 0;
+}
+.v-subtitlesList li {
+  list-style-type: none;
+  text-align: left;
+}
+.v-trackButton {
+  color: black;
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
+  padding: 8px 15px 8px 30px;
+  position: relative;
+  text-align: left;
+  transition: background-color 0.25s ease;
+  width: max-content;
+}
+.v-trackButton.v-active svg {
+  display: block;
+}
+.v-trackButton svg {
+  fill: #ff7f15;
+  display: none;
+  left: 5px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+}
+
+.v-vlite.v-paused:not(.v-firstStart) .v-poster, .v-vlite.v-playing .v-bigPlay, .v-vlite.v-playing .v-poster {
+    opacity: 0;
+    visibility: hidden;
+}
+.v-bigPlay, .v-bigPlay svg {
+    transition: opacity 0.25s ease;
+} 
+.v-controlButton:hover {
+  opacity: 1;
+}
+.v-controlButton {
+  -webkit-appearance: none;
+  appearance: none;
+  align-items: center;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: inherit;
+  height: 100%;
+  justify-content: center;
+  opacity: 0.9;
+  outline: none;
+  padding: 0;
+  position: relative;
+  transition: opacity 0.25s ease;
+  width: var(--width-bar);
+}
+.v-bigPlay, .v-bigPlay svg {
+  transition: opacity 0.25s ease;
+}
+.v-bigPlay {
+  height: 58px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translateX(-50%) translateY(-50%);
+  width: 58px;
+  z-index: 2;
+}
+.v-bigPlay svg {
+  fill: #fff;
+  height: 100%;
+  opacity: 0.9;
+  width: 100%;
+}
+.v-bigPlay, .v-bigPlay svg {
+  transition: opacity 0.25s ease;
+}
+.v-controlButton svg {
+  fill: #fff;
+  height: 65px;
+  width: 65px;
+}
+
+.App-item.focus {
+  border: 1px solid #808080;
+  background: #61616152;
+  font-size: 24px;
+}
+#block-mouse {
+  width: 200px;
+  height: 200px;
+  position:absolute;
+  left: 0px;
+  top: 0px;
+  border:1px solid #fff;
+}
+.f-active{
+  background-color: #818080c5;
+}
+.s-active{
+  background-color: #818080c5;
+}
+#sample_video:fullscreen .mang{
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+}
