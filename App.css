@@ -7,11 +7,16 @@
   font-size: var(--font-size-subtitle);
   font-weight: 700;
   font-family: Tahoma;
-  background-color: black;
+  background-color: #000;
   color:gold;
   position:absolute;
   top: 1px;
  }
+/* Chrome/Safari vẽ thêm lớp nền mờ (rgba(0,0,0,.8)) phía sau cue -> ép đen đặc */
+.react-player video::-webkit-media-text-track-display-backdrop{
+  background-color: #000 !important;
+  background: #000 !important;
+}
  .subtitle-track {
   width: 50%
  }
@@ -501,6 +506,9 @@ img {
   background-color: #818080c5;
 }
 .a-active{
+  background-color: #818080c5;
+}
+.d-active{
   background-color: #818080c5;
 }
 #sample_video:fullscreen .mang{

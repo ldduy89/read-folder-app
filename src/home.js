@@ -371,6 +371,96 @@ const Home = (props) => {
     }
   };
 
+  // ---------- Danh sách phụ đề bên cạnh video (PC) ----------
+  const [cueList, setCueList] = useState([]); // [{ start, end, text }]
+  const [cueIndex, setCueIndex] = useState(-1); // cue đang được phát (-1: không có)
+  const lastCueRef = useRef(-2);
+  const userScrollRef = useRef(0);
+  const activeSubLang = _.get(_.find(subtitles || [], (sub) => sub.default), "language", null);
+
+  const cleanCueText = (text) =>
+    (text || "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\{[^}]*\}/g, "")
+      .replace(/\s*\n\s*/g, " ")
+      .trim();
+
+  const formatClock = (sec) => {
+    const total = Math.max(Math.floor(sec), 0);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const ss = String(total % 60).padStart(2, "0");
+    return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+  };
+
+  // Đổi ngôn ngữ phụ đề / đổi file -> xoá danh sách cũ
+  useEffect(() => {
+    setCueList([]);
+    setCueIndex(-1);
+    lastCueRef.current = -2;
+  }, [activeSubLang, pathViewFile]);
+
+  // Đọc cue từ track phụ đề đang chọn (đọc lại khi đổi độ trễ vì thời gian cue đã bị dịch)
+  useEffect(() => {
+    if (!isMouse || type !== "file" || !activeSubLang) return;
+    let timer;
+    let tries = 0;
+    const load = () => {
+      const videoEl = document.getElementsByTagName("video")[0];
+      const track = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks).find((t) => t.language === activeSubLang) : null;
+      if (track && track.cues && track.cues.length) {
+        setCueList(Array.from(track.cues).map((c) => ({ start: c.startTime, end: c.endTime, text: cleanCueText(c.text) })));
+        lastCueRef.current = -2;
+      } else if (tries++ < 120) {
+        timer = setTimeout(load, 500); // phụ đề tải bất đồng bộ, thử lại tối đa ~60s
+      }
+    };
+    load();
+    return () => clearTimeout(timer);
+  }, [activeSubLang, subDelay, pathViewFile]);
+
+  // Theo dõi thời gian video -> highlight cue hiện tại và cuộn tới nó
+  useEffect(() => {
+    if (!isMouse || _.isEmpty(cueList)) return;
+    const id = setInterval(() => {
+      const player = playerRef.current;
+      if (!player) return;
+      const t = player.getCurrentTime() || 0;
+      let lo = 0;
+      let hi = cueList.length - 1;
+      let found = -1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (cueList[mid].start <= t) {
+          found = mid;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      const live = found >= 0 && t < cueList[found].end ? found : -1;
+      setCueIndex((prev) => (prev === live ? prev : live));
+      if (found !== lastCueRef.current) {
+        lastCueRef.current = found;
+        const panel = document.getElementById("cue_panel");
+        const item = document.getElementById(`cue_${found}`);
+        // Người dùng vừa tự cuộn thì không giành quyền cuộn trong 3 giây
+        if (panel && item && Date.now() - userScrollRef.current > 3000) {
+          panel.scrollTo({ top: item.offsetTop - panel.clientHeight / 2 + item.offsetHeight / 2, behavior: "smooth" });
+        }
+      }
+    }, 250);
+    return () => clearInterval(id);
+  }, [cueList]);
+
+  const seekToCue = (cue) => {
+    const player = playerRef.current;
+    if (!player) return;
+    const target = Math.max(cue.start, 0) + 0.01;
+    player.seekTo(target, "seconds");
+    if (state.duration > 0) setStateElm({ played: target / state.duration });
+  };
+
   const boxDelayHandle = () => {
     if (_.isEmpty(subtitles)) return;
     if (!boxDelay) {
@@ -408,14 +498,16 @@ const Home = (props) => {
   };
 
   useEffect(() => {
-    if (sample_video && type === "file") {
+    // Chỉ tự full screen trên TV. PC: người dùng tự bật bằng phím F / nút / double click.
+    if (sample_video && type === "file" && !isMouse) {
       handleFullSreen(true);
     }
   }, [sample_video]);
 
   const onFullSreenEvent = (e) => {
     if (!document.fullscreenElement) {
-      history.replace(`/${backRootPath}`, { folder: _.last(fullPathRoot) });
+      // TV: thoát full screen = quay về danh sách. PC: ở lại trang xem video.
+      if (!isMouse) history.replace(`/${backRootPath}`, { folder: _.last(fullPathRoot) });
       setIsFullSreen(false);
     } else {
       setIsFullSreen(true);
@@ -672,6 +764,14 @@ const Home = (props) => {
             e.preventDefault();
             handleFullSreen(!isFullSreen);
             break;
+          case "Escape":
+          case "Backspace":
+            // Đang full screen thì Esc do trình duyệt xử lý (thoát full screen); lần sau mới quay về danh sách
+            if (!document.fullscreenElement) {
+              e.preventDefault();
+              history.replace(`/${backRootPath}`, { folder: _.last(fullPathRoot) });
+            }
+            break;
           default:
             break;
         }
@@ -728,7 +828,7 @@ const Home = (props) => {
         }}
       >
         <header className="App-header">
-          <div className="App-body" id="body">
+          <div className="App-body" id="body" style={isMouse && type === "file" ? { width: "96vw", maxWidth: "1800px", height: "auto", overflow: "visible" } : undefined}>
             <b>
               {root !== "" ? (
                 <Link id={`path_0`} to="/">
@@ -776,8 +876,8 @@ const Home = (props) => {
                 );
               })
             ) : (
-              <>
-                <div className="player-wrapper">
+              <div style={isMouse ? { display: "flex", gap: "12px", alignItems: "flex-start" } : undefined}>
+                <div className="player-wrapper" style={isMouse ? { height: "80vh", flex: 1, minWidth: 0 } : undefined}>
                   <div
                     onMouseMove={(event) => {
                       handleAutoHide();
@@ -1120,7 +1220,53 @@ const Home = (props) => {
                     </div>
                   </div>
                 </div>
-              </>
+                {isMouse && !_.isEmpty(subtitles) && (
+                  <div
+                    id="cue_panel"
+                    onWheel={() => (userScrollRef.current = Date.now())}
+                    onMouseDown={() => (userScrollRef.current = Date.now())}
+                    onTouchStart={() => (userScrollRef.current = Date.now())}
+                    style={{
+                      width: "360px",
+                      flexShrink: 0,
+                      height: "80vh",
+                      overflowY: "auto",
+                      position: "relative",
+                      background: "#141414",
+                      color: "#ddd",
+                      textAlign: "left",
+                      cursor: "default",
+                      fontSize: "15px",
+                      lineHeight: 1.4,
+                      borderRadius: "6px"
+                    }}
+                  >
+                    {!activeSubLang ? (
+                      <div style={{ padding: "16px", color: "#888" }}>Phụ đề đang tắt. Bật phụ đề ở nút CC để xem danh sách.</div>
+                    ) : _.isEmpty(cueList) ? (
+                      <div style={{ padding: "16px", color: "#888" }}>Đang tải phụ đề...</div>
+                    ) : (
+                      cueList.map((cue, i) => (
+                        <div
+                          id={`cue_${i}`}
+                          key={i}
+                          onClick={() => seekToCue(cue)}
+                          style={{
+                            padding: "6px 10px",
+                            cursor: "pointer",
+                            borderLeft: `3px solid ${i === cueIndex ? "#ffd700" : "transparent"}`,
+                            background: i === cueIndex ? "#2c2c2c" : "transparent",
+                            color: i === cueIndex ? "#fff" : "#aaa"
+                          }}
+                        >
+                          <span style={{ color: "#777", fontSize: "12px", marginRight: "8px" }}>{formatClock(cue.start)}</span>
+                          {cue.text}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             <br />
             <br />
