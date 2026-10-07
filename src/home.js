@@ -27,6 +27,9 @@ const Home = (props) => {
   const publicURL = `http://${hostname}:8081/public/`;
   const subtitlesURL = `http://${hostname}:8081/subtitles/`;
   const trasksURL = `http://${hostname}:8081/trasks/`;
+  const audiosURL = `http://${hostname}:8081/audios/`;
+  const audioPrepareURL = `http://${hostname}:8081/audio-prepare/`;
+  const audioFileURL = `http://${hostname}:8081/audio-file/`;
   const sample_video = document.getElementById("sample_video");
   const video = document.getElementsByTagName("video")[0];
   const textTracks = _.get(video, "textTracks", null);
@@ -57,6 +60,15 @@ const Home = (props) => {
   const [indexFile, setIndexFile] = useState(null);
   const [indexSub, setIndexSub] = useState(0);
   const [isMouse, setIsMouse] = useState(false);
+  const [audioList, setAudioList] = useState([]);
+  const [boxAudio, setBoxAudio] = useState(false);
+  const [indexAudio, setIndexAudio] = useState(0);
+  const [toast, setToast] = useState("");
+  const toastRef = useRef(null);
+  const [extAudio, setExtAudio] = useState(false); // đang phát audio ngoài (đã tách) đồng bộ với video
+  const audioRef = useRef(null); // thẻ <audio> phát audio được chọn
+  const audioTokenRef = useRef(0); // huỷ polling cũ khi chọn audio khác / đổi file
+  const audioTargetRef = useRef(null); // audio đang được chọn (kể cả khi đang tách)
 
   if (!_.isEmpty(textTracks) && !_.isEmpty(subtitles)) {
     const subtitle = subtitles.find((s) => s.default);
@@ -78,12 +90,16 @@ const Home = (props) => {
     setSubtitles(null);
     setStateElm({ played: 0, playing: true });
     setBoxTracks(false);
+    setBoxAudio(false);
+    stopExternalAudio();
+    setAudioList([]);
     if (type !== "file") {
       fetch(publicURL + fullPathRoot.join("/"))
         .then((response) => response.json())
         .then((data) => setFolders(data));
     } else {
       getSubtitles();
+      getAudioList();
       fetch(publicURL + backRootPath)
         .then((response) => response.json())
         .then((data) => setFilesOfParent(data.filter((d) => d.type === "file")));
@@ -142,6 +158,158 @@ const Home = (props) => {
       subFile.classList.add("s-active");
     }
   }, [indexSub]);
+
+  useEffect(() => {
+    const items = document.getElementsByClassName("a-active");
+    if (items && !_.isEmpty(items)) {
+      for (const element of Array.from(items)) {
+        element.classList.remove("a-active");
+      }
+    }
+    const audioItem = document.getElementById(`aud_${indexAudio}`);
+    if (audioItem) {
+      audioItem.classList.add("a-active");
+    }
+  }, [indexAudio, boxAudio, audioList]);
+
+  // ---------- Chọn audio (server tách audio track -> phát bằng <audio> đồng bộ với video) ----------
+  const encodedPathViewFile = () => pathViewFile.split("/").map(encodeURIComponent).join("/");
+
+  const showToast = (text, ms = 2000) => {
+    setToast(text);
+    clearTimeout(toastRef.current);
+    if (ms > 0) toastRef.current = setTimeout(() => setToast(""), ms);
+  };
+
+  const getAudioList = () => {
+    audioTargetRef.current = null;
+    fetch(audiosURL + encodedPathViewFile())
+      .then((response) => response.json())
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        const defaultIndex = Math.max(_.findIndex(data, (a) => a.default), 0);
+        setAudioList(data.map((a, i) => ({ label: a.label, isDefault: i === defaultIndex, enabled: i === defaultIndex })));
+      })
+      .catch(() => setAudioList([]));
+  };
+
+  const markAudioEnabled = (index) => {
+    setAudioList((list) => list.map((a, i) => ({ ...a, enabled: i === index })));
+    setIndexAudio(index);
+  };
+
+  const stopExternalAudio = () => {
+    audioTokenRef.current = 0;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    setExtAudio(false);
+  };
+
+  const startExternalAudio = (index) => {
+    if (!audioRef.current) audioRef.current = new Audio();
+    const audio = audioRef.current;
+    audio.src = audioFileURL + encodedPathViewFile() + `?track=${index}`;
+    audio.preload = "auto";
+    audio.currentTime = playerRef.current ? playerRef.current.getCurrentTime() || 0 : 0;
+    setExtAudio(true);
+  };
+
+  const changeAudio = (index) => {
+    const item = audioList[index];
+    if (!item) return;
+    audioTargetRef.current = index;
+    const token = Date.now();
+    audioTokenRef.current = token;
+
+    if (item.isDefault) {
+      // Audio gốc: trình duyệt tự phát cùng video
+      stopExternalAudio();
+      audioTargetRef.current = index;
+      markAudioEnabled(index);
+      showToast(`Audio: ${item.label}`);
+      return;
+    }
+
+    showToast(`Đang chuẩn bị audio: ${item.label}...`, 0);
+    const poll = () => {
+      fetch(audioPrepareURL + encodedPathViewFile() + `?track=${index}`)
+        .then((response) => response.json())
+        .then((data) => {
+          if (audioTokenRef.current !== token) return; // đã chọn audio khác
+          if (data.ready) {
+            startExternalAudio(index);
+            markAudioEnabled(index);
+            showToast(`Audio: ${item.label}`);
+          } else if (data.waiting) {
+            setTimeout(poll, 1500);
+          } else {
+            audioTargetRef.current = null;
+            showToast("Không tách được audio này", 3000);
+          }
+        })
+        .catch(() => {
+          if (audioTokenRef.current !== token) return;
+          audioTargetRef.current = null;
+          showToast("Không kết nối được server audio", 3000);
+        });
+    };
+    poll();
+  };
+
+  const cycleAudio = () => {
+    if (audioList.length < 2) {
+      showToast("File này chỉ có 1 audio");
+      return;
+    }
+    let current = audioTargetRef.current;
+    if (current === null || current === undefined) current = Math.max(_.findIndex(audioList, (a) => a.enabled), 0);
+    changeAudio((current + 1) % audioList.length);
+  };
+
+  const boxAudioHandle = () => {
+    if (_.isEmpty(audioList)) return;
+    if (!boxAudio) {
+      setIndexAudio(Math.max(_.findIndex(audioList, (a) => a.enabled), 0));
+      setBoxTracks(false);
+    }
+    setBoxAudio(!boxAudio);
+  };
+
+  // Đồng bộ <audio> với trạng thái của video
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !extAudio) return;
+    audio.volume = state.volume;
+    audio.muted = state.muted;
+    audio.playbackRate = state.playbackRate;
+    if (state.playing) audio.play().catch(() => {});
+    else audio.pause();
+  }, [extAudio, state.playing, state.volume, state.muted, state.playbackRate]);
+
+  // Sửa lệch giữa audio và video (> 0.3s)
+  useEffect(() => {
+    if (!extAudio) return;
+    const id = setInterval(() => {
+      const audio = audioRef.current;
+      const player = playerRef.current;
+      if (!audio || !player) return;
+      const t = player.getCurrentTime() || 0;
+      if (Math.abs(audio.currentTime - t) > 0.3) audio.currentTime = t;
+    }, 500);
+    return () => clearInterval(id);
+  }, [extAudio]);
+
+  // Rời trang: dừng audio
+  useEffect(() => {
+    return () => {
+      audioTokenRef.current = 0;
+      if (audioRef.current) audioRef.current.pause();
+    };
+  }, []);
 
   const changeSubtitle = (language, noSetSub) => {
     if (textTracks && textTracks.length > 0) {
@@ -222,6 +390,7 @@ const Home = (props) => {
       currentRef.current = setTimeout((indexFile) => {
         setHide(true);
         setBoxTracks(false);
+        setBoxAudio(false);
         if (indexFile !== 0) setIndexFile(0);
       }, 3000);
     }
@@ -249,6 +418,13 @@ const Home = (props) => {
   };
 
   const upDownVideoHandle = (action) => {
+    if (boxAudio) {
+      let newIndex = action ? indexAudio + 1 : indexAudio - 1;
+      if (newIndex < 0) newIndex = audioList.length - 1;
+      if (newIndex >= audioList.length) newIndex = 0;
+      setIndexAudio(newIndex);
+      return;
+    }
     if (!boxTracks) {
       let newIndex = action ? 3 : 0;
       if (indexFile === 0 && !action) {
@@ -270,8 +446,8 @@ const Home = (props) => {
       handleChangeSeek(action);
     } else {
       let newIndex = action ? indexFile + 1 : indexFile - 1;
-      if (newIndex < 1) newIndex = 8;
-      if (newIndex > 8) newIndex = 1;
+      if (newIndex < 1) newIndex = 9;
+      if (newIndex > 9) newIndex = 1;
       setIndexFile(newIndex);
     }
   };
@@ -281,7 +457,10 @@ const Home = (props) => {
       const index = _.findIndex(subtitles, (s) => !!s.default);
       setIndexSub(index + 1);
     }
-    !_.isEmpty(subtitles) && setBoxTracks(!boxTracks);
+    if (!_.isEmpty(subtitles)) {
+      setBoxAudio(false);
+      setBoxTracks(!boxTracks);
+    }
   };
 
   // ---------- Điều khiển bằng bàn phím ----------
@@ -374,6 +553,11 @@ const Home = (props) => {
           case "M":
             e.preventDefault();
             setStateElm({ muted: !state.muted });
+            break;
+          case "a":
+          case "A":
+            e.preventDefault();
+            if (!e.repeat) cycleAudio();
             break;
           case "n":
           case "N":
@@ -517,6 +701,9 @@ const Home = (props) => {
                       if (!isMouse) {
                         if (indexFile === 0) {
                           setStateElm({ playing: !state.playing });
+                        } else if (boxAudio) {
+                          document.getElementsByClassName("a-active")[0]?.click();
+                          setIndexFile(0);
                         } else if (boxTracks) {
                           document.getElementsByClassName("s-active")[0].click();
                           setIndexFile(0);
@@ -543,7 +730,12 @@ const Home = (props) => {
                         loop={state.loop}
                         playbackRate={state.playbackRate}
                         volume={state.volume}
-                        muted={state.muted}
+                        muted={state.muted || extAudio}
+                        onSeek={(seconds) => {
+                          if (extAudio && audioRef.current) audioRef.current.currentTime = seconds;
+                        }}
+                        onBuffer={() => extAudio && audioRef.current && audioRef.current.pause()}
+                        onBufferEnd={() => extAudio && state.playing && audioRef.current && audioRef.current.play().catch(() => {})}
                         onDuration={(duration) => setStateElm({ duration: duration })}
                         onEnded={() => handleActionFile(nextFile, backRootPath)}
                         onProgress={(stage) => setStateElm({ played: stage.played })}
@@ -564,6 +756,24 @@ const Home = (props) => {
                       />
                     )}
 
+                    {!!toast && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "8%",
+                          right: "4%",
+                          zIndex: 20,
+                          padding: "8px 16px",
+                          borderRadius: 6,
+                          background: "rgba(0,0,0,0.75)",
+                          color: "#fff",
+                          fontSize: "var(--font-size)",
+                          pointerEvents: "none"
+                        }}
+                      >
+                        {toast}
+                      </div>
+                    )}
                     <div className={`v-topBar ${hide ? "hidden" : ""}`}>
                       <span className="v-topTitle">{fileName}</span>
                     </div>
@@ -692,7 +902,31 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_7" onClick={() => setStateElm({ muted: !state.muted })}>
+                        <div className={`v-subtitle`} id="play_7" onClick={() => boxAudioHandle()}>
+                          <span className="v-subIcon">
+                            <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.size(audioList) > 1 ? "1" : "0.3"}`}>
+                              <path
+                                d="M18,8 C12.5,8 8,12.5 8,18 L8,24 C8,25.1 8.9,26 10,26 L12,26 L12,19 L10,19 C10,14.6 13.6,11 18,11 C22.4,11 26,14.6 26,19 L24,19 L24,26 L26,26 C27.1,26 28,25.1 28,24 L28,18 C28,12.5 23.5,8 18,8 Z"
+                                fill="#fff"
+                              ></path>
+                            </svg>
+                          </span>
+                          <div className={`v-subtitlesList ${boxAudio ? "v-active" : ""}`}>
+                            <ul>
+                              {audioList.map((audio, index) => (
+                                <li id={`aud_${index}`} onClick={() => changeAudio(index)} key={index}>
+                                  <button className={`v-trackButton ${audio.enabled ? "v-active" : ""}`}>
+                                    <svg viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M5.6 10.6 1.4 6.4 0 7.8l5.6 5.6 12-12L16.2 0z"></path>
+                                    </svg>
+                                    {audio.label}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_8" onClick={() => setStateElm({ muted: !state.muted })}>
                           <span className="v-playerIcon v-iconVolumeHigh">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <path
@@ -713,7 +947,7 @@ const Home = (props) => {
                             </svg>
                           </span>
                         </div>
-                        <div className={`v-fullscreen ${isFullSreen ? "v-exit" : ""}`} id="play_8" onClick={() => handleFullSreen(!isFullSreen)}>
+                        <div className={`v-fullscreen ${isFullSreen ? "v-exit" : ""}`} id="play_9" onClick={() => handleFullSreen(!isFullSreen)}>
                           <span className="v-playerIcon v-iconFullscreen">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <g className="ytp-fullscreen-button-corner-0">
