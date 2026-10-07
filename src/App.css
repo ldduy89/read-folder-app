@@ -135,7 +135,7 @@ img {
     top: 0;
     left: 0;
     width: 100%;
-    height: calc(100% - 50px);
+    height: calc(100% - var(--width-bar, 50px));
 }
 .v-vlite a, .v-vlite div, .v-vlite form, .v-vlite label, .v-vlite li, .v-vlite p, .v-vlite span, .v-vlite ul {
   margin: 0;
@@ -381,6 +381,7 @@ img {
   visibility: visible;
 }
 .v-subtitlesList {
+  font-size: calc(var(--font-size, 12px) * 1.1);
   background-color: #fff;
   border-radius: 5px;
   bottom: var(--width-bar);
@@ -463,12 +464,12 @@ img {
   transition: opacity 0.25s ease;
 }
 .v-bigPlay {
-  height: 58px;
+  height: calc(var(--width-bar, 50px) * 1.2);
   left: 50%;
   position: absolute;
   top: 50%;
   transform: translateX(-50%) translateY(-50%);
-  width: 58px;
+  width: calc(var(--width-bar, 50px) * 1.2);
   z-index: 2;
 }
 .v-bigPlay svg {

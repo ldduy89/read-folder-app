@@ -6,6 +6,8 @@ import "./App.css";
 import ReactPlayer from "react-player";
 import _ from "lodash";
 import Duration from "./Duration";
+import { plainCueText } from "./assText";
+import { buildAssLayer } from "./assLayer";
 import { isTV } from "./device";
 import { Link, useHistory } from "react-router-dom";
 
@@ -27,6 +29,7 @@ const Home = (props) => {
   const type = queryParams.get("type");
   const publicURL = `http://${hostname}:8081/public/`;
   const subtitlesURL = `http://${hostname}:8081/subtitles/`;
+  const subtitlesStyleURL = `http://${hostname}:8081/subtitles-style/`;
   const trasksURL = `http://${hostname}:8081/trasks/`;
   const audiosURL = `http://${hostname}:8081/audios/`;
   const audioPrepareURL = `http://${hostname}:8081/audio-prepare/`;
@@ -375,7 +378,7 @@ const Home = (props) => {
   const [cueList, setCueList] = useState([]); // [{ start, end, text }]
   const [cueIndex, setCueIndex] = useState(-1); // cue đang được phát (-1: không có)
   const [loopIndex, setLoopIndex] = useState(-1); // cue đang bật lặp lại (-1: tắt)
-  const loopWaitRef = useRef(false); // đang nghỉ 1s giữa hai lần lặp
+  const loopWaitRef = useRef(false); // khoá ngắn sau mỗi lần tua lặp
   const loopTimerRef = useRef(null);
   const loopSinceRef = useRef(0);
   const setStateElmRef = useRef(null);
@@ -383,29 +386,34 @@ const Home = (props) => {
   const userScrollRef = useRef(0);
   const activeSubLang = _.get(_.find(subtitles || [], (sub) => sub.default), "language", null);
 
-  const cleanCueText = (text) =>
-    (text || "")
-      .replace(/<[^>]+>/g, "")
-      .replace(/\{[^}]*\}/g, "")
-      .replace(/\s*\n\s*/g, " ")
-      .trim();
+  const cleanCueText = (text) => plainCueText(text);
 
-  // ---------- Phụ đề tự vẽ: nền đen đặc 100% (nền cue gốc của trình duyệt luôn hơi mờ) ----------
-  const [liveSub, setLiveSub] = useState("");
+  // ---------- Phụ đề tự vẽ theo thiết lập trong sub (ASS: vị trí, cỡ chữ, màu...), nền đen đặc ----------
+  const [liveCues, setLiveCues] = useState([]); // cue đang hiển thị: [{ key, id, text }]
+  const [assMeta, setAssMeta] = useState(null); // { playResX, playResY, styles } của sub đang chọn
   useEffect(() => {
-    setLiveSub("");
+    setAssMeta(null);
+    if (type !== "file" || !activeSubLang || !pathViewFile) return;
+    let cancelled = false;
+    fetch(subtitlesStyleURL + pathViewFile + `?language=${activeSubLang}`)
+      .then((r) => r.json())
+      .then((d) => !cancelled && setAssMeta(d || {}))
+      .catch(() => !cancelled && setAssMeta({}));
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSubLang, pathViewFile]);
+
+  useEffect(() => {
+    setLiveCues([]);
     if (type !== "file" || !activeSubLang) return;
     let timer;
     let tries = 0;
     let track = null;
     const onCueChange = () => {
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
-      setLiveSub(
-        cues
-          .map((c) => (c.text || "").replace(/<[^>]+>/g, "").replace(/\{[^}]*\}/g, "").trim())
-          .filter(Boolean)
-          .join("\n")
-      );
+      const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: c.text || "" }));
+      setLiveCues((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     };
     const attach = () => {
       const videoEl = document.getElementsByTagName("video")[0];
@@ -450,7 +458,11 @@ const Home = (props) => {
       const videoEl = document.getElementsByTagName("video")[0];
       const track = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks).find((t) => t.language === activeSubLang) : null;
       if (track && track.cues && track.cues.length) {
-        setCueList(Array.from(track.cues).map((c) => ({ start: c.startTime, end: c.endTime, text: cleanCueText(c.text) })));
+        setCueList(
+          Array.from(track.cues)
+            .map((c) => ({ start: c.startTime, end: c.endTime, text: cleanCueText(c.text) }))
+            .filter((c) => c.text)
+        );
         lastCueRef.current = -2;
       } else if (tries++ < 120) {
         timer = setTimeout(load, 500); // phụ đề tải bất đồng bộ, thử lại tối đa ~60s
@@ -502,7 +514,7 @@ const Home = (props) => {
     if (state.duration > 0) setStateElm({ played: target / state.duration });
   };
 
-  // Lặp lại một phụ đề: hết cue thì dừng 1s rồi tua về đầu cue và phát tiếp
+  // Lặp lại một phụ đề: hết cue thì tua ngay về đầu cue và phát tiếp
   useEffect(() => {
     if (loopIndex < 0) return;
     const id = setInterval(() => {
@@ -517,22 +529,18 @@ const Home = (props) => {
         return;
       }
       if (t >= cue.end - 0.05) {
+        // Hết câu -> tua ngay về đầu câu, không dừng; khoá ngắn để không tua lặp nhiều lần
         loopWaitRef.current = true;
-        setStateElmRef.current({ playing: false });
+        player.seekTo(cue.start + 0.01, "seconds");
         loopTimerRef.current = setTimeout(() => {
           loopWaitRef.current = false;
-          player.seekTo(cue.start + 0.01, "seconds");
-          setStateElmRef.current({ playing: true });
-        }, 1000);
+        }, 300);
       }
     }, 50);
     return () => {
       clearInterval(id);
       clearTimeout(loopTimerRef.current);
-      if (loopWaitRef.current) {
-        loopWaitRef.current = false;
-        setStateElmRef.current({ playing: true }); // đang nghỉ mà tắt lặp -> cho video chạy tiếp
-      }
+      loopWaitRef.current = false;
     };
   }, [loopIndex, cueList]);
 
@@ -583,16 +591,21 @@ const Home = (props) => {
 
   // Theo dõi kích thước khung video (đổi cỡ cửa sổ, vào/ra toàn màn hình) để chữ phụ đề co giãn theo
   const [frameH, setFrameH] = useState(0);
+  const [frameW, setFrameW] = useState(0);
   useEffect(() => {
     let ro;
     let timer;
     let tries = 0;
+    const measure = (el) => {
+      setFrameH(Math.round(el.offsetHeight));
+      setFrameW(Math.round(el.offsetWidth));
+    };
     const attach = () => {
       const el = document.getElementById("sample_video");
       if (el) {
-        setFrameH(Math.round(el.offsetHeight));
+        measure(el);
         if (typeof ResizeObserver !== "undefined") {
-          ro = new ResizeObserver(() => setFrameH(Math.round(el.offsetHeight)));
+          ro = new ResizeObserver(() => measure(el));
           ro.observe(el);
         }
       } else if (tries++ < 20) {
@@ -601,7 +614,7 @@ const Home = (props) => {
     };
     const onWinResize = () => {
       const el = document.getElementById("sample_video");
-      if (el) setFrameH(Math.round(el.offsetHeight));
+      if (el) measure(el);
     };
     attach();
     window.addEventListener("resize", onWinResize);
@@ -614,10 +627,46 @@ const Home = (props) => {
     };
   }, [type, pathViewFile]);
 
+  // Vùng hình video thật sự hiển thị (trừ viền đen khi khác tỉ lệ khung) — toạ độ ASS tính theo vùng này
+  const [picRect, setPicRect] = useState(null);
+  useEffect(() => {
+    const calc = () => {
+      const frame = document.getElementById("sample_video");
+      const videoEl = document.getElementsByTagName("video")[0];
+      if (!frame) return;
+      const fw = frame.offsetWidth;
+      const fh = frame.offsetHeight;
+      if (!fw || !fh) return;
+      const vw = videoEl ? videoEl.videoWidth : 0;
+      const vh = videoEl ? videoEl.videoHeight : 0;
+      let r = { left: 0, top: 0, width: fw, height: fh, vw, vh };
+      if (vw && vh) {
+        const k = Math.min(fw / vw, fh / vh);
+        const w = vw * k;
+        const h = vh * k;
+        r = { left: (fw - w) / 2, top: (fh - h) / 2, width: w, height: h, vw, vh };
+      }
+      setPicRect((prev) =>
+        prev && Math.abs(prev.left - r.left) < 0.5 && Math.abs(prev.top - r.top) < 0.5 && Math.abs(prev.width - r.width) < 0.5 && Math.abs(prev.height - r.height) < 0.5 && prev.vw === r.vw && prev.vh === r.vh
+          ? prev
+          : r
+      );
+    };
+    calc();
+    const id = setInterval(calc, 500); // video có thể được tạo sau, hoặc đổi độ phân giải giữa chừng
+    window.addEventListener("resize", calc);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("resize", calc);
+    };
+  }, [frameW, frameH, pathViewFile]);
+
   const videoH = frameH || (sample_video ? sample_video.offsetHeight : 0);
+  const videoW = frameW || (sample_video ? sample_video.offsetWidth : 0);
   const sizeBar = {
-    "--width-bar": videoH >= 1080 ? "100px" : "50px",
-    "--font-size": videoH >= 1080 ? "24px" : "12px",
+    // Nút điều khiển và chữ thời gian co giãn liên tục theo độ rộng khung video
+    "--width-bar": videoW ? Math.round(Math.min(Math.max(videoW / 28, 32), 110)) + "px" : "50px",
+    "--font-size": videoW ? Math.round(Math.min(Math.max(videoW / 90, 11), 26)) + "px" : "12px",
     "--font-size-subtitle": videoH ? Math.max(videoH / 18, 14) + "px" : "24px"
   };
 
@@ -1076,37 +1125,7 @@ const Home = (props) => {
                       />
                     )}
 
-                    {!!liveSub && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          left: "5%",
-                          right: "5%",
-                          bottom: "calc(var(--width-bar) + 2%)",
-                          zIndex: 15,
-                          textAlign: "center",
-                          pointerEvents: "none"
-                        }}
-                      >
-                        <span
-                          style={{
-                            display: "inline",
-                            whiteSpace: "pre-line",
-                            background: "#000",
-                            color: "gold",
-                            fontFamily: "Tahoma, sans-serif",
-                            fontWeight: 700,
-                            fontSize: "var(--font-size-subtitle)",
-                            lineHeight: 1.35,
-                            padding: "0.05em 0.3em",
-                            WebkitBoxDecorationBreak: "clone",
-                            boxDecorationBreak: "clone"
-                          }}
-                        >
-                          {liveSub}
-                        </span>
-                      </div>
-                    )}
+                    {buildAssLayer(liveCues, assMeta, picRect)}
 
                     {!!toast && (
                       <div
@@ -1426,7 +1445,7 @@ const Home = (props) => {
                           </div>
                           <button
                             type="button"
-                            title="Lặp lại câu này (dừng 1s giữa mỗi lần lặp)"
+                            title="Lặp lại câu này"
                             aria-pressed={i === loopIndex}
                             onClick={(e) => {
                               e.stopPropagation();
