@@ -60,10 +60,13 @@ const Home = (props) => {
   const [isFullSreen, setIsFullSreen] = useState(false);
   const [indexFile, setIndexFile] = useState(null);
   const [indexSub, setIndexSub] = useState(0);
+  const [subDelay, setSubDelay] = useState(0); // độ trễ phụ đề (giây). Dương = phụ đề hiện trễ hơn
   // TV: điều khiển kiểu remote (di chuyển chuột để chọn). PC/khác: dùng chuột bình thường.
   const isMouse = !isTV();
   const [audioList, setAudioList] = useState([]);
   const [boxAudio, setBoxAudio] = useState(false);
+  const [boxDelay, setBoxDelay] = useState(false); // menu chỉnh độ trễ phụ đề
+  const [indexDelay, setIndexDelay] = useState(0);
   const [indexAudio, setIndexAudio] = useState(0);
   const [toast, setToast] = useState("");
   const toastRef = useRef(null);
@@ -90,9 +93,11 @@ const Home = (props) => {
 
   useLayoutEffect(() => {
     setSubtitles(null);
+    setSubDelay(0);
     setStateElm({ played: 0, playing: true });
     setBoxTracks(false);
     setBoxAudio(false);
+    setBoxDelay(false);
     stopExternalAudio();
     setAudioList([]);
     if (type !== "file") {
@@ -277,6 +282,7 @@ const Home = (props) => {
     if (!boxAudio) {
       setIndexAudio(Math.max(_.findIndex(audioList, (a) => a.enabled), 0));
       setBoxTracks(false);
+      setBoxDelay(false);
     }
     setBoxAudio(!boxAudio);
   };
@@ -325,6 +331,71 @@ const Home = (props) => {
     });
     if (!noSetSub) setSubtitles(newSybtitle);
   };
+
+  useEffect(() => {
+    const items = document.getElementsByClassName("d-active");
+    if (items && !_.isEmpty(items)) {
+      for (const element of Array.from(items)) {
+        element.classList.remove("d-active");
+      }
+    }
+    const delayItem = document.getElementById(`del_${indexDelay}`);
+    if (delayItem) {
+      delayItem.classList.add("d-active");
+    }
+  }, [indexDelay, boxDelay]);
+
+  // ---------- Chỉnh độ trễ phụ đề ----------
+  const SUB_DELAY_STEP = 0.1; // giây
+  const SUB_DELAY_STEP_LONG = 1; // giây, giữ Shift
+
+  const formatDelay = (d) => `${d > 0 ? "+" : ""}${d.toFixed(1)}s`;
+
+  // Dịch thời gian của tất cả cue (tính từ thời điểm gốc nên không bị cộng dồn sai số)
+  const applySubDelay = (delay) => {
+    const videoEl = document.getElementsByTagName("video")[0];
+    if (!videoEl || !videoEl.textTracks) return;
+    for (const track of Array.from(videoEl.textTracks)) {
+      if (!track.cues) continue;
+      for (const cue of Array.from(track.cues)) {
+        const applied = cue._subDelay || 0;
+        if (applied === delay) continue;
+        if (cue._origStart === undefined) {
+          cue._origStart = cue.startTime;
+          cue._origEnd = cue.endTime;
+        }
+        cue.startTime = cue._origStart + delay;
+        cue.endTime = cue._origEnd + delay;
+        cue._subDelay = delay;
+      }
+    }
+  };
+
+  const boxDelayHandle = () => {
+    if (_.isEmpty(subtitles)) return;
+    if (!boxDelay) {
+      setIndexDelay(0);
+      setBoxTracks(false);
+      setBoxAudio(false);
+    }
+    setBoxDelay(!boxDelay);
+  };
+
+  const changeSubDelay = (delta) => {
+    const next = delta === null ? 0 : _.clamp(_.round(subDelay + delta, 1), -60, 60);
+    setSubDelay(next);
+    applySubDelay(next);
+    showToast(`Độ trễ phụ đề: ${formatDelay(next)}`);
+    handleAutoHide();
+  };
+
+  // Phụ đề tải bất đồng bộ / bị nạp lại -> áp lại độ trễ định kỳ khi đang có chỉnh
+  useEffect(() => {
+    applySubDelay(subDelay);
+    if (subDelay === 0) return;
+    const id = setInterval(() => applySubDelay(subDelay), 1000);
+    return () => clearInterval(id);
+  }, [subDelay]);
 
   const handleActionFile = (fileName, path) => {
     if (fileName) history.replace(`/${[path, fileName].join("/")}?type=file`);
@@ -395,6 +466,7 @@ const Home = (props) => {
         setHide(true);
         setBoxTracks(false);
         setBoxAudio(false);
+        setBoxDelay(false);
         if (!isMouse) setIndexFile(0);
       }, 3000);
     }
@@ -422,6 +494,13 @@ const Home = (props) => {
   };
 
   const upDownVideoHandle = (action) => {
+    if (boxDelay) {
+      let newIndex = action ? indexDelay + 1 : indexDelay - 1;
+      if (newIndex < 0) newIndex = 2;
+      if (newIndex > 2) newIndex = 0;
+      setIndexDelay(newIndex);
+      return;
+    }
     if (boxAudio) {
       let newIndex = action ? indexAudio + 1 : indexAudio - 1;
       if (newIndex < 0) newIndex = audioList.length - 1;
@@ -450,8 +529,8 @@ const Home = (props) => {
       handleChangeSeek(action);
     } else {
       let newIndex = action ? indexFile + 1 : indexFile - 1;
-      if (newIndex < 1) newIndex = 9;
-      if (newIndex > 9) newIndex = 1;
+      if (newIndex < 1) newIndex = 10;
+      if (newIndex > 10) newIndex = 1;
       setIndexFile(newIndex);
     }
   };
@@ -463,6 +542,7 @@ const Home = (props) => {
     }
     if (!_.isEmpty(subtitles)) {
       setBoxAudio(false);
+      setBoxDelay(false);
       setBoxTracks(!boxTracks);
     }
   };
@@ -562,6 +642,16 @@ const Home = (props) => {
           case "A":
             e.preventDefault();
             if (!e.repeat) cycleAudio();
+            break;
+          case "h":
+          case "H":
+            e.preventDefault();
+            changeSubDelay(e.shiftKey ? SUB_DELAY_STEP_LONG : SUB_DELAY_STEP);
+            break;
+          case "g":
+          case "G":
+            e.preventDefault();
+            changeSubDelay(-(e.shiftKey ? SUB_DELAY_STEP_LONG : SUB_DELAY_STEP));
             break;
           case "n":
           case "N":
@@ -702,6 +792,9 @@ const Home = (props) => {
                       if (!isMouse) {
                         if (indexFile === 0) {
                           setStateElm({ playing: !state.playing });
+                        } else if (boxDelay) {
+                          document.getElementsByClassName("d-active")[0]?.click();
+                          setIndexFile(0);
                         } else if (boxAudio) {
                           document.getElementsByClassName("a-active")[0]?.click();
                           setIndexFile(0);
@@ -903,7 +996,48 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_7" onClick={() => boxAudioHandle()}>
+                        <div className={`v-subtitle`} id="play_7" onClick={() => boxDelayHandle()}>
+                          <span className="v-subIcon">
+                            <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.isEmpty(subtitles) ? "0.3" : "1"}`}>
+                              <path
+                                d="M18 9a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm-1 3v5.4l4.2 2.5 1-1.6-3.2-1.9V14z"
+                                fill="#fff"
+                              ></path>
+                            </svg>
+                          </span>
+                          <div className={`v-subtitlesList ${boxDelay ? "v-active" : ""}`}>
+                            <ul>
+                              <li
+                                id="del_0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  changeSubDelay(SUB_DELAY_STEP);
+                                }}
+                              >
+                                <button className="v-trackButton">Trễ hơn (+0.1s)</button>
+                              </li>
+                              <li
+                                id="del_1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  changeSubDelay(-SUB_DELAY_STEP);
+                                }}
+                              >
+                                <button className="v-trackButton">Sớm hơn (-0.1s)</button>
+                              </li>
+                              <li
+                                id="del_2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  changeSubDelay(null);
+                                }}
+                              >
+                                <button className="v-trackButton">Đặt lại độ trễ ({formatDelay(subDelay)})</button>
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
+                        <div className={`v-subtitle`} id="play_8" onClick={() => boxAudioHandle()}>
                           <span className="v-subIcon">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.size(audioList) > 1 ? "1" : "0.3"}`}>
                               <path
@@ -927,7 +1061,7 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_8" onClick={() => setStateElm({ muted: !state.muted })}>
+                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_9" onClick={() => setStateElm({ muted: !state.muted })}>
                           <span className="v-playerIcon v-iconVolumeHigh">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <path
@@ -948,7 +1082,7 @@ const Home = (props) => {
                             </svg>
                           </span>
                         </div>
-                        <div className={`v-fullscreen ${isFullSreen ? "v-exit" : ""}`} id="play_9" onClick={() => handleFullSreen(!isFullSreen)}>
+                        <div className={`v-fullscreen ${isFullSreen ? "v-exit" : ""}`} id="play_10" onClick={() => handleFullSreen(!isFullSreen)}>
                           <span className="v-playerIcon v-iconFullscreen">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <g className="ytp-fullscreen-button-corner-0">

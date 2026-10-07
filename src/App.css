@@ -500,6 +500,12 @@ img {
 .s-active{
   background-color: #818080c5;
 }
+.a-active{
+  background-color: #818080c5;
+}
+.d-active{
+  background-color: #818080c5;
+}
 #sample_video:fullscreen .mang{
   position: absolute;
   width: 100%;
