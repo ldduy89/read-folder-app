@@ -78,7 +78,7 @@ const Home = (props) => {
   if (!_.isEmpty(textTracks) && !_.isEmpty(subtitles)) {
     const subtitle = subtitles.find((s) => s.default);
     for (const element of textTracks) {
-      element.mode = element.language === subtitle?.language ? "showing" : "hidden";
+      element.mode = "hidden"; // phụ đề tự vẽ bằng overlay (nền đen đặc)
     }
   }
 
@@ -322,7 +322,7 @@ const Home = (props) => {
   const changeSubtitle = (language, noSetSub) => {
     if (textTracks && textTracks.length > 0) {
       for (const element of textTracks) {
-        element.mode = element.language === language ? "showing" : "hidden";
+        element.mode = "hidden";
       }
     }
     const newSybtitle = _.clone(subtitles);
@@ -374,6 +374,11 @@ const Home = (props) => {
   // ---------- Danh sách phụ đề bên cạnh video (PC) ----------
   const [cueList, setCueList] = useState([]); // [{ start, end, text }]
   const [cueIndex, setCueIndex] = useState(-1); // cue đang được phát (-1: không có)
+  const [loopIndex, setLoopIndex] = useState(-1); // cue đang bật lặp lại (-1: tắt)
+  const loopWaitRef = useRef(false); // đang nghỉ 1s giữa hai lần lặp
+  const loopTimerRef = useRef(null);
+  const loopSinceRef = useRef(0);
+  const setStateElmRef = useRef(null);
   const lastCueRef = useRef(-2);
   const userScrollRef = useRef(0);
   const activeSubLang = _.get(_.find(subtitles || [], (sub) => sub.default), "language", null);
@@ -384,6 +389,41 @@ const Home = (props) => {
       .replace(/\{[^}]*\}/g, "")
       .replace(/\s*\n\s*/g, " ")
       .trim();
+
+  // ---------- Phụ đề tự vẽ: nền đen đặc 100% (nền cue gốc của trình duyệt luôn hơi mờ) ----------
+  const [liveSub, setLiveSub] = useState("");
+  useEffect(() => {
+    setLiveSub("");
+    if (type !== "file" || !activeSubLang) return;
+    let timer;
+    let tries = 0;
+    let track = null;
+    const onCueChange = () => {
+      const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
+      setLiveSub(
+        cues
+          .map((c) => (c.text || "").replace(/<[^>]+>/g, "").replace(/\{[^}]*\}/g, "").trim())
+          .filter(Boolean)
+          .join("\n")
+      );
+    };
+    const attach = () => {
+      const videoEl = document.getElementsByTagName("video")[0];
+      track = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks).find((t) => t.language === activeSubLang) : null;
+      if (track) {
+        track.mode = "hidden";
+        track.addEventListener("cuechange", onCueChange);
+        onCueChange();
+      } else if (tries++ < 120) {
+        timer = setTimeout(attach, 500);
+      }
+    };
+    attach();
+    return () => {
+      clearTimeout(timer);
+      if (track) track.removeEventListener("cuechange", onCueChange);
+    };
+  }, [activeSubLang, pathViewFile]);
 
   const formatClock = (sec) => {
     const total = Math.max(Math.floor(sec), 0);
@@ -398,6 +438,7 @@ const Home = (props) => {
     setCueList([]);
     setCueIndex(-1);
     lastCueRef.current = -2;
+    setLoopIndex(-1);
   }, [activeSubLang, pathViewFile]);
 
   // Đọc cue từ track phụ đề đang chọn (đọc lại khi đổi độ trễ vì thời gian cue đã bị dịch)
@@ -461,6 +502,55 @@ const Home = (props) => {
     if (state.duration > 0) setStateElm({ played: target / state.duration });
   };
 
+  // Lặp lại một phụ đề: hết cue thì dừng 1s rồi tua về đầu cue và phát tiếp
+  useEffect(() => {
+    if (loopIndex < 0) return;
+    const id = setInterval(() => {
+      if (loopWaitRef.current) return;
+      const cue = cueList[loopIndex];
+      const player = playerRef.current;
+      if (!cue || !player) return;
+      if (Date.now() - loopSinceRef.current < 800) return; // chờ lệnh tua ban đầu có hiệu lực
+      const t = player.getCurrentTime() || 0;
+      if (t < cue.start - 0.5 || t > cue.end + 0.5) {
+        setLoopIndex(-1); // người dùng tua ra ngoài câu -> tắt lặp
+        return;
+      }
+      if (t >= cue.end - 0.05) {
+        loopWaitRef.current = true;
+        setStateElmRef.current({ playing: false });
+        loopTimerRef.current = setTimeout(() => {
+          loopWaitRef.current = false;
+          player.seekTo(cue.start + 0.01, "seconds");
+          setStateElmRef.current({ playing: true });
+        }, 1000);
+      }
+    }, 50);
+    return () => {
+      clearInterval(id);
+      clearTimeout(loopTimerRef.current);
+      if (loopWaitRef.current) {
+        loopWaitRef.current = false;
+        setStateElmRef.current({ playing: true }); // đang nghỉ mà tắt lặp -> cho video chạy tiếp
+      }
+    };
+  }, [loopIndex, cueList]);
+
+  const toggleLoop = (i) => {
+    if (loopIndex === i) {
+      setLoopIndex(-1);
+      return;
+    }
+    const cue = cueList[i];
+    const player = playerRef.current;
+    if (!cue || !player) return;
+    const target = Math.max(cue.start, 0) + 0.01;
+    loopSinceRef.current = Date.now();
+    player.seekTo(target, "seconds");
+    setLoopIndex(i);
+    setStateElm({ playing: true, ...(state.duration > 0 ? { played: target / state.duration } : {}) });
+  };
+
   const boxDelayHandle = () => {
     if (_.isEmpty(subtitles)) return;
     if (!boxDelay) {
@@ -519,6 +609,8 @@ const Home = (props) => {
     _.assign(newStage, value);
     setState(newStage);
   };
+
+  setStateElmRef.current = setStateElm;
 
   const handleFullSreen = (isFullSreen) => {
     if (isFullSreen) {
@@ -950,6 +1042,38 @@ const Home = (props) => {
                       />
                     )}
 
+                    {!!liveSub && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: "5%",
+                          right: "5%",
+                          bottom: "calc(var(--width-bar) + 2%)",
+                          zIndex: 15,
+                          textAlign: "center",
+                          pointerEvents: "none"
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: "inline",
+                            whiteSpace: "pre-line",
+                            background: "#000",
+                            color: "gold",
+                            fontFamily: "Tahoma, sans-serif",
+                            fontWeight: 700,
+                            fontSize: "var(--font-size-subtitle)",
+                            lineHeight: 1.35,
+                            padding: "0.05em 0.3em",
+                            WebkitBoxDecorationBreak: "clone",
+                            boxDecorationBreak: "clone"
+                          }}
+                        >
+                          {liveSub}
+                        </span>
+                      </div>
+                    )}
+
                     {!!toast && (
                       <div
                         style={{
@@ -1254,13 +1378,42 @@ const Home = (props) => {
                           style={{
                             padding: "6px 10px",
                             cursor: "pointer",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "8px",
                             borderLeft: `3px solid ${i === cueIndex ? "#ffd700" : "transparent"}`,
                             background: i === cueIndex ? "#2c2c2c" : "transparent",
                             color: i === cueIndex ? "#fff" : "#aaa"
                           }}
                         >
-                          <span style={{ color: "#777", fontSize: "12px", marginRight: "8px" }}>{formatClock(cue.start)}</span>
-                          {cue.text}
+                          <div style={{ flex: 1 }}>
+                            <span style={{ color: "#777", fontSize: "12px", marginRight: "8px" }}>{formatClock(cue.start)}</span>
+                            {cue.text}
+                          </div>
+                          <button
+                            type="button"
+                            title="Lặp lại câu này (dừng 1s giữa mỗi lần lặp)"
+                            aria-pressed={i === loopIndex}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleLoop(i);
+                            }}
+                            style={{
+                              flexShrink: 0,
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "50%",
+                              border: "1px solid " + (i === loopIndex ? "#ffd700" : "#444"),
+                              background: i === loopIndex ? "#ffd700" : "transparent",
+                              color: i === loopIndex ? "#000" : "#888",
+                              fontSize: "14px",
+                              lineHeight: "26px",
+                              padding: 0,
+                              cursor: "pointer"
+                            }}
+                          >
+                            ⟲
+                          </button>
                         </div>
                       ))
                     )}
