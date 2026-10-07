@@ -581,10 +581,44 @@ const Home = (props) => {
     if (fileName) history.replace(`/${[path, fileName].join("/")}?type=file`);
   };
 
+  // Theo dõi kích thước khung video (đổi cỡ cửa sổ, vào/ra toàn màn hình) để chữ phụ đề co giãn theo
+  const [frameH, setFrameH] = useState(0);
+  useEffect(() => {
+    let ro;
+    let timer;
+    let tries = 0;
+    const attach = () => {
+      const el = document.getElementById("sample_video");
+      if (el) {
+        setFrameH(Math.round(el.offsetHeight));
+        if (typeof ResizeObserver !== "undefined") {
+          ro = new ResizeObserver(() => setFrameH(Math.round(el.offsetHeight)));
+          ro.observe(el);
+        }
+      } else if (tries++ < 20) {
+        timer = setTimeout(attach, 300);
+      }
+    };
+    const onWinResize = () => {
+      const el = document.getElementById("sample_video");
+      if (el) setFrameH(Math.round(el.offsetHeight));
+    };
+    attach();
+    window.addEventListener("resize", onWinResize);
+    document.addEventListener("fullscreenchange", onWinResize);
+    return () => {
+      clearTimeout(timer);
+      if (ro) ro.disconnect();
+      window.removeEventListener("resize", onWinResize);
+      document.removeEventListener("fullscreenchange", onWinResize);
+    };
+  }, [type, pathViewFile]);
+
+  const videoH = frameH || (sample_video ? sample_video.offsetHeight : 0);
   const sizeBar = {
-    "--width-bar": sample_video && sample_video.offsetHeight >= 1080 ? "100px" : "50px",
-    "--font-size": sample_video && sample_video.offsetHeight >= 1080 ? "24px" : "12px",
-    "--font-size-subtitle": sample_video ? sample_video.offsetHeight / 18 + "px" : "24px"
+    "--width-bar": videoH >= 1080 ? "100px" : "50px",
+    "--font-size": videoH >= 1080 ? "24px" : "12px",
+    "--font-size-subtitle": videoH ? Math.max(videoH / 18, 14) + "px" : "24px"
   };
 
   useEffect(() => {
