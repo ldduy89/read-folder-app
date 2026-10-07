@@ -284,6 +284,154 @@ const Home = (props) => {
     !_.isEmpty(subtitles) && setBoxTracks(!boxTracks);
   };
 
+  // ---------- Điều khiển bằng bàn phím ----------
+  const SEEK_STEP = 10; // giây, phím ← →
+  const SEEK_STEP_LONG = 60; // giây, Shift + ← →
+
+  const seekBy = (delta) => {
+    const player = playerRef.current;
+    if (!player) return;
+    const current = player.getCurrentTime() || 0;
+    const max = state.duration > 0 ? Math.max(state.duration - 1, 0) : Infinity;
+    const target = Math.min(Math.max(current + delta, 0), max);
+    player.seekTo(target, "seconds");
+    if (state.duration > 0) setStateElm({ played: target / state.duration });
+    handleAutoHide();
+  };
+
+  const togglePlay = () => {
+    setStateElm({ playing: !state.playing });
+    handleAutoHide();
+  };
+
+  const changeVolume = (delta) => {
+    const volume = Math.min(Math.max(_.round(state.volume + delta, 2), 0), 1);
+    setStateElm({ volume, muted: false });
+    handleAutoHide();
+  };
+
+  // Gắn lại listener sau mỗi lần render để handler luôn thấy state mới nhất
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = e.target && e.target.tagName;
+      if (tag === "TEXTAREA" || (tag === "INPUT" && e.target.type !== "range")) return;
+
+      // Tránh việc phím Space/Enter vừa chạy shortcut vừa "bấm" nút đang được focus
+      const active = document.activeElement;
+      if (active && (active.tagName === "BUTTON" || (active.tagName === "INPUT" && active.type === "range"))) {
+        active.blur();
+      }
+
+      if (type === "file") {
+        switch (e.key) {
+          case " ":
+          case "Spacebar":
+          case "Enter":
+          case "k":
+          case "K":
+          case "MediaPlayPause":
+            e.preventDefault();
+            if (!e.repeat) togglePlay();
+            break;
+          case "MediaPlay":
+            e.preventDefault();
+            setStateElm({ playing: true });
+            break;
+          case "MediaPause":
+            e.preventDefault();
+            setStateElm({ playing: false });
+            break;
+          case "ArrowRight":
+            e.preventDefault();
+            seekBy(e.shiftKey ? SEEK_STEP_LONG : SEEK_STEP);
+            break;
+          case "ArrowLeft":
+            e.preventDefault();
+            seekBy(-(e.shiftKey ? SEEK_STEP_LONG : SEEK_STEP));
+            break;
+          case "l":
+          case "L":
+          case "MediaFastForward":
+            e.preventDefault();
+            seekBy(SEEK_STEP_LONG / 6);
+            break;
+          case "j":
+          case "J":
+          case "MediaRewind":
+            e.preventDefault();
+            seekBy(-SEEK_STEP_LONG / 6);
+            break;
+          case "ArrowUp":
+            e.preventDefault();
+            changeVolume(0.1);
+            break;
+          case "ArrowDown":
+            e.preventDefault();
+            changeVolume(-0.1);
+            break;
+          case "m":
+          case "M":
+            e.preventDefault();
+            setStateElm({ muted: !state.muted });
+            break;
+          case "n":
+          case "N":
+          case "PageDown":
+          case "MediaTrackNext":
+            e.preventDefault();
+            handleActionFile(nextFile, backRootPath);
+            break;
+          case "p":
+          case "P":
+          case "PageUp":
+          case "MediaTrackPrevious":
+            e.preventDefault();
+            handleActionFile(previousFile, backRootPath);
+            break;
+          case "f":
+          case "F":
+            e.preventDefault();
+            handleFullSreen(!isFullSreen);
+            break;
+          default:
+            break;
+        }
+      } else {
+        // Màn hình danh sách thư mục / file
+        switch (e.key) {
+          case "ArrowUp":
+          case "ArrowLeft":
+            e.preventDefault();
+            if (!_.isEmpty(folders)) actionInListFileHandle(false);
+            break;
+          case "ArrowDown":
+          case "ArrowRight":
+            e.preventDefault();
+            if (!_.isEmpty(folders)) actionInListFileHandle(true);
+            break;
+          case "Enter": {
+            e.preventDefault();
+            const link = document.getElementsByClassName("f-active")[0]?.getElementsByTagName("a")[0];
+            if (link) link.click();
+            break;
+          }
+          case "Backspace":
+            if (root !== "") {
+              e.preventDefault();
+              history.replace(`/${backRootPath}`, { folder: _.last(fullPathRoot) });
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   return (
     <>
       <div style={{ position: "fixed" }} onClick={() => setIsMouse(!isMouse)}>
