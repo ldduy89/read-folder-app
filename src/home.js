@@ -6,6 +6,7 @@ import "./App.css";
 import ReactPlayer from "react-player";
 import _ from "lodash";
 import Duration from "./Duration";
+import { isTV } from "./device";
 import { Link, useHistory } from "react-router-dom";
 
 const Home = (props) => {
@@ -59,7 +60,8 @@ const Home = (props) => {
   const [isFullSreen, setIsFullSreen] = useState(false);
   const [indexFile, setIndexFile] = useState(null);
   const [indexSub, setIndexSub] = useState(0);
-  const [isMouse, setIsMouse] = useState(false);
+  // TV: điều khiển kiểu remote (di chuyển chuột để chọn). PC/khác: dùng chuột bình thường.
+  const isMouse = !isTV();
   const [audioList, setAudioList] = useState([]);
   const [boxAudio, setBoxAudio] = useState(false);
   const [indexAudio, setIndexAudio] = useState(0);
@@ -620,9 +622,6 @@ const Home = (props) => {
 
   return (
     <>
-      <div style={{ position: "fixed" }} onClick={() => setIsMouse(!isMouse)}>
-        <button>{isMouse ? "To Remote" : "To Mouse"}</button>
-      </div>
       <div
         className="App"
         onMouseMove={(event) => {
