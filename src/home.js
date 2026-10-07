@@ -386,12 +386,14 @@ const Home = (props) => {
   const handleAutoHide = (event) => {
     setHide(false);
     clearTimeout(currentRef.current);
-    if (indexFile === 0) {
-      currentRef.current = setTimeout((indexFile) => {
+    // Chế độ chuột: luôn tự ẩn sau 3s, không phụ thuộc indexFile (indexFile chỉ dùng cho chế độ remote)
+    // Chế độ remote: chỉ tự ẩn khi đang ở thanh điều khiển chính (indexFile === 0)
+    if (isMouse || indexFile === 0) {
+      currentRef.current = setTimeout(() => {
         setHide(true);
         setBoxTracks(false);
         setBoxAudio(false);
-        if (indexFile !== 0) setIndexFile(0);
+        if (!isMouse) setIndexFile(0);
       }, 3000);
     }
   };
