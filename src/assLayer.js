@@ -16,8 +16,54 @@ const segStyle = (seg, sy, resY, wrap) => ({
   padding: "0.04em 0.28em",
   whiteSpace: wrap ? "pre-wrap" : "pre",
   WebkitBoxDecorationBreak: "clone",
-  boxDecorationBreak: "clone"
+  boxDecorationBreak: "clone",
+  // Cho phép bôi đen / copy chữ sub (lớp bao ngoài vẫn pointer-events:none nên vùng trống không chặn click của video)
+  pointerEvents: "auto",
+  userSelect: "text",
+  WebkitUserSelect: "text",
+  cursor: "text"
 });
+
+
+// Cue có \pos: neo theo toạ độ của sub, nhưng nếu khối chữ rộng hơn khoảng trống thì đẩy lại cho nằm trọn trong khung hình
+// (tránh bị cắt mất một đầu như "anh Long Tông"), giống cách libass giữ sub trong màn hình.
+const PositionedCue = ({ left, top, tx, ty, picW, picH, zIndex, children }) => {
+  const ref = React.useRef(null);
+  const [shift, setShift] = React.useState({ x: 0, y: 0 });
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const l = left + tx * w; // mép trái/trên khi chưa dịch
+    const t = top + ty * h;
+    let x = 0;
+    let y = 0;
+    if (w >= picW) x = -l; // rộng hơn cả khung: ưu tiên hiện từ mép trái
+    else if (l < 0) x = -l;
+    else if (l + w > picW) x = picW - (l + w);
+    if (h >= picH) y = -t;
+    else if (t < 0) y = -t;
+    else if (t + h > picH) y = picH - (t + h);
+    setShift((p) => (Math.abs(p.x - x) < 0.5 && Math.abs(p.y - y) < 0.5 ? p : { x, y }));
+  });
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "absolute",
+        left: left + "px",
+        top: top + "px",
+        width: "max-content",
+        maxWidth: picW + "px",
+        transform: `translate(calc(${tx * 100}% + ${shift.x}px), calc(${ty * 100}% + ${shift.y}px))`,
+        zIndex
+      }}
+    >
+      {children}
+    </div>
+  );
+};
 
 const renderLines = (parsed, sy, resY, col, wrap) =>
   parsed.lines.map((line, li) => (
@@ -36,8 +82,10 @@ const renderLines = (parsed, sy, resY, col, wrap) =>
  *  assMeta:  { playResX, playResY, styles } từ /subtitles-style (có thể rỗng)
  *  pic:      { left, top, width, height } vùng hình video thật sự hiển thị trong khung
  */
-export const buildAssLayer = (liveCues, assMeta, pic) => {
-  if (!pic || !pic.width || !pic.height || !liveCues || !liveCues.length) return null;
+export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
+  if (!pic || !pic.width || !pic.height) return null;
+  liveCues = liveCues || [];
+  if (!liveCues.length && !(opts.secondary && opts.secondary.length)) return null;
   const meta = assMeta || {};
   // Thiếu PlayRes (cache cũ / track không có header): dùng kích thước thật của video thay vì 1920x1080 cố định,
   // vì đa số sub được làm theo đúng độ phân giải video (vd 4K = 3840x2160) -> vị trí & cỡ chữ không bị lệch 2 lần
@@ -68,19 +116,18 @@ export const buildAssLayer = (liveCues, assMeta, pic) => {
     if (parsed.pos) {
       // Có \pos / \move: đặt đúng toạ độ, neo theo alignment của dòng
       positioned.push(
-        <div
+        <PositionedCue
           key={key}
-          style={{
-            position: "absolute",
-            left: parsed.pos.x * sx + "px",
-            top: parsed.pos.y * sy + "px",
-            width: "max-content",
-            transform: `translate(${["0%", "-50%", "-100%"][col]}, ${["-100%", "-50%", "0%"][row]})`,
-            zIndex: m.layer || 0
-          }}
+          left={parsed.pos.x * sx}
+          top={parsed.pos.y * sy}
+          tx={[0, -0.5, -1][col]}
+          ty={[-1, -0.5, 0][row]}
+          picW={pic.width}
+          picH={pic.height}
+          zIndex={m.layer || 0}
         >
           {renderLines(parsed, sy, resY, col, false)}
-        </div>
+        </PositionedCue>
       );
       return;
     }
@@ -93,6 +140,34 @@ export const buildAssLayer = (liveCues, assMeta, pic) => {
       </div>
     );
   });
+
+  // Sub 2: chữ thường (không đậm), nhỏ hơn, nằm dưới sub 1 (nút đầu tiên của nhóm căn dưới-giữa = sát đáy)
+  const secondary = (opts.secondary || []).filter((c) => c && c.text);
+  if (secondary.length) {
+    const baseStyle = styles.Default || styles[styleNames[0]] || {};
+    const secFs = (baseStyle.fontSize || resY / 18) * 0.8;
+    const secLines = [];
+    secondary.forEach((c) => {
+      parseAssCue(c.text, DEFAULT_ASS_STYLE, null).lines.forEach((line) => {
+        const t = line.map((seg) => seg.text).join("").replace(/\u00a0/g, " ").trim();
+        if (t) secLines.push(t);
+      });
+    });
+    if (secLines.length) {
+      const segSec = { font: "", fs: secFs, bold: false, italic: false, underline: false, strike: false, color: "#f2f2f2" };
+      const node = (
+        <div key="sec2" style={{ textAlign: "center" }}>
+          {secLines.map((t, i) => (
+            <div key={i} style={{ fontSize: 0, lineHeight: 0, textAlign: "center" }}>
+              <span style={segStyle(segSec, sy, resY, true)}>{t}</span>
+            </div>
+          ))}
+        </div>
+      );
+      const g = groups[2] || (groups[2] = { col: 1, row: 0, style: { ...DEFAULT_ASS_STYLE }, m: {}, nodes: [] });
+      g.nodes.unshift(node);
+    }
+  }
 
   const groupEls = Object.keys(groups).map((k) => {
     const g = groups[k];
@@ -132,6 +207,13 @@ export const buildAssLayer = (liveCues, assMeta, pic) => {
         height: pic.height + "px",
         zIndex: 15,
         pointerEvents: "none"
+      }}
+      // sự kiện chuột chỉ tới được đây khi bấm trúng chữ sub: không cho lan ra làm play/pause hay phóng to
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        if (opts.onGrab) opts.onGrab(); // bấm vào chữ -> tạm dừng để bôi đen kịp
       }}
     >
       {groupEls}

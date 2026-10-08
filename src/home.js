@@ -47,7 +47,14 @@ const Home = (props) => {
     played: 0,
     loaded: 0,
     duration: 0,
-    playbackRate: 1.0,
+    playbackRate: (() => {
+      try {
+        const r = parseFloat(localStorage.getItem("playbackRate"));
+        return r >= 0.25 && r <= 3 ? r : 1.0;
+      } catch (e) {
+        return 1.0;
+      }
+    })(),
     loop: false
   };
 
@@ -68,6 +75,7 @@ const Home = (props) => {
   const isMouse = !isTV();
   const [audioList, setAudioList] = useState([]);
   const [boxAudio, setBoxAudio] = useState(false);
+  const [boxSpeed, setBoxSpeed] = useState(false); // menu tốc độ phát
   const [boxDelay, setBoxDelay] = useState(false); // menu chỉnh độ trễ phụ đề
   const [indexDelay, setIndexDelay] = useState(0);
   const [indexAudio, setIndexAudio] = useState(0);
@@ -101,6 +109,7 @@ const Home = (props) => {
     setBoxTracks(false);
     setBoxAudio(false);
     setBoxDelay(false);
+    setBoxSpeed(false);
     stopExternalAudio();
     setAudioList([]);
     if (type !== "file") {
@@ -286,6 +295,7 @@ const Home = (props) => {
       setIndexAudio(Math.max(_.findIndex(audioList, (a) => a.enabled), 0));
       setBoxTracks(false);
       setBoxDelay(false);
+      setBoxSpeed(false);
     }
     setBoxAudio(!boxAudio);
   };
@@ -433,6 +443,53 @@ const Home = (props) => {
     };
   }, [activeSubLang, pathViewFile]);
 
+  // ---------- Sub 2 (hiện nhỏ, không đậm, nằm dưới sub 1) ----------
+  const [secondLang, setSecondLang] = useState(() => {
+    try {
+      return localStorage.getItem("secondSubLang") || null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const chooseSecondSub = (language) => {
+    setSecondLang(language);
+    try {
+      if (language) localStorage.setItem("secondSubLang", language);
+      else localStorage.removeItem("secondSubLang");
+    } catch (e) {}
+  };
+  const secLang =
+    secondLang && secondLang !== activeSubLang && (subtitles || []).some((sub) => sub.language === secondLang) ? secondLang : null;
+  const [liveCues2, setLiveCues2] = useState([]);
+  useEffect(() => {
+    setLiveCues2([]);
+    if (type !== "file" || !secLang) return;
+    let timer;
+    let tries = 0;
+    let track = null;
+    const onCueChange = () => {
+      const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
+      const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, text: c.text || "" }));
+      setLiveCues2((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    };
+    const attach = () => {
+      const videoEl = document.getElementsByTagName("video")[0];
+      track = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks).find((t) => t.language === secLang) : null;
+      if (track) {
+        track.mode = "hidden"; // hidden vẫn tải cue, chỉ không để trình duyệt tự vẽ
+        track.addEventListener("cuechange", onCueChange);
+        onCueChange();
+      } else if (tries++ < 120) {
+        timer = setTimeout(attach, 500);
+      }
+    };
+    attach();
+    return () => {
+      clearTimeout(timer);
+      if (track) track.removeEventListener("cuechange", onCueChange);
+    };
+  }, [secLang, activeSubLang, pathViewFile]);
+
   const formatClock = (sec) => {
     const total = Math.max(Math.floor(sec), 0);
     const h = Math.floor(total / 3600);
@@ -565,8 +622,32 @@ const Home = (props) => {
       setIndexDelay(0);
       setBoxTracks(false);
       setBoxAudio(false);
+      setBoxSpeed(false);
     }
     setBoxDelay(!boxDelay);
+  };
+
+  const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+  const SPEED_STEP = 0.25;
+  const formatSpeed = (r) => `${_.round(r, 2)}x`;
+  const boxSpeedHandle = () => {
+    if (!boxSpeed) {
+      setBoxTracks(false);
+      setBoxAudio(false);
+      setBoxDelay(false);
+    }
+    setBoxSpeed(!boxSpeed);
+  };
+  // delta === null: về 1x; còn lại: tăng/giảm tương đối. Cũng nhận { set: x } để chọn thẳng một mức
+  const changeSpeed = (delta) => {
+    const next =
+      delta === null ? 1 : delta && delta.set ? delta.set : _.clamp(_.round(state.playbackRate + delta, 2), 0.25, 3);
+    setStateElm({ playbackRate: next });
+    try {
+      localStorage.setItem("playbackRate", String(next));
+    } catch (e) {}
+    showToast(`Tốc độ: ${formatSpeed(next)}`);
+    handleAutoHide();
   };
 
   const changeSubDelay = (delta) => {
@@ -667,6 +748,8 @@ const Home = (props) => {
     // Nút điều khiển và chữ thời gian co giãn liên tục theo độ rộng khung video
     "--width-bar": videoW ? Math.round(Math.min(Math.max(videoW / 28, 32), 110)) + "px" : "50px",
     "--font-size": videoW ? Math.round(Math.min(Math.max(videoW / 90, 11), 26)) + "px" : "12px",
+    // Chiều cao tối đa của popup chọn (sub / tốc độ / audio): không cao quá khung video
+    "--menu-max-h": videoH ? Math.max(videoH - Math.round(Math.min(Math.max(videoW / 28, 32), 110)) - 16, 80) + "px" : "70vh",
     "--font-size-subtitle": videoH ? Math.max(videoH / 18, 14) + "px" : "24px"
   };
 
@@ -734,6 +817,7 @@ const Home = (props) => {
         setBoxTracks(false);
         setBoxAudio(false);
         setBoxDelay(false);
+        setBoxSpeed(false);
         if (!isMouse) setIndexFile(0);
       }, 3000);
     }
@@ -810,6 +894,7 @@ const Home = (props) => {
     if (!_.isEmpty(subtitles)) {
       setBoxAudio(false);
       setBoxDelay(false);
+      setBoxSpeed(false);
       setBoxTracks(!boxTracks);
     }
   };
@@ -909,6 +994,20 @@ const Home = (props) => {
           case "A":
             e.preventDefault();
             if (!e.repeat) cycleAudio();
+            break;
+          case "]":
+          case ">":
+            e.preventDefault();
+            changeSpeed(SPEED_STEP);
+            break;
+          case "[":
+          case "<":
+            e.preventDefault();
+            changeSpeed(-SPEED_STEP);
+            break;
+          case "\\":
+            e.preventDefault();
+            changeSpeed(null);
             break;
           case "h":
           case "H":
@@ -1125,7 +1224,7 @@ const Home = (props) => {
                       />
                     )}
 
-                    {buildAssLayer(liveCues, assMeta, picRect)}
+                    {buildAssLayer(liveCues, assMeta, picRect, { secondary: secLang ? liveCues2 : [], onGrab: () => state.playing && setStateElm({ playing: false }) })}
 
                     {!!toast && (
                       <div
@@ -1245,7 +1344,9 @@ const Home = (props) => {
                             </svg>
                           </span>
                           <div className={`v-subtitlesList ${boxTracks ? "v-active" : ""}`}>
+                            <div style={{ display: "flex", alignItems: "flex-start" }}>
                             <ul>
+                              <li style={{ padding: "0.6em 1em 0.2em 2.2em", color: "#777", fontSize: "0.8em", pointerEvents: "none", whiteSpace: "nowrap" }}>Sub 1</li>
                               <li id={`sub_0`} onClick={() => changeSubtitle(null)}>
                                 <button
                                   className={`v-trackButton ${!subtitles || !subtitles.find((s) => !!s.default) ? "v-active" : ""}`}
@@ -1270,6 +1371,71 @@ const Home = (props) => {
                                     </li>
                                   );
                                 })}
+                            </ul>
+                            {subtitles && subtitles.length > 1 && (
+                              <ul style={{ borderLeft: "1px solid #ddd" }}>
+                                <li style={{ padding: "0.6em 1em 0.2em 2.2em", color: "#777", fontSize: "0.8em", pointerEvents: "none", whiteSpace: "nowrap" }}>
+                                  Sub 2
+                                </li>
+                                <li onClick={() => chooseSecondSub(null)}>
+                                  <button className={`v-trackButton ${!secLang ? "v-active" : ""}`} data-language="off">
+                                    <svg viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M5.6 10.6 1.4 6.4 0 7.8l5.6 5.6 12-12L16.2 0z"></path>
+                                    </svg>
+                                    Off
+                                  </button>
+                                </li>
+                                {subtitles
+                                  .filter((sub) => sub.language !== activeSubLang)
+                                  .map((sub, index) => (
+                                    <li onClick={() => chooseSecondSub(sub.language)} key={`s2_${index}`}>
+                                      <button className={`v-trackButton ${secLang === sub.language ? "v-active" : ""}`} data-language="off">
+                                        <svg viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
+                                          <path d="M5.6 10.6 1.4 6.4 0 7.8l5.6 5.6 12-12L16.2 0z"></path>
+                                        </svg>
+                                        {sub.lable}
+                                      </button>
+                                    </li>
+                                  ))}
+                              </ul>
+                            )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`v-subtitle`} id="play_speed" onClick={() => boxSpeedHandle()}>
+                          <span className="v-subIcon">
+                            <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
+                              <text
+                                x="18"
+                                y="23"
+                                textAnchor="middle"
+                                fill="#fff"
+                                fontWeight="700"
+                                fontSize={formatSpeed(state.playbackRate).length <= 2 ? 16 : formatSpeed(state.playbackRate).length <= 4 ? 13 : 11}
+                                fontFamily="inherit"
+                              >
+                                {formatSpeed(state.playbackRate)}
+                              </text>
+                            </svg>
+                          </span>
+                          <div className={`v-subtitlesList ${boxSpeed ? "v-active" : ""}`}>
+                            <ul>
+                              {SPEED_OPTIONS.map((r) => (
+                                <li
+                                  key={`speed_${r}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    changeSpeed({ set: r });
+                                  }}
+                                >
+                                  <button className={`v-trackButton ${state.playbackRate === r ? "v-active" : ""}`}>
+                                    <svg viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M5.6 10.6 1.4 6.4 0 7.8l5.6 5.6 12-12L16.2 0z"></path>
+                                    </svg>
+                                    {r === 1 ? "Bình thường (1x)" : formatSpeed(r)}
+                                  </button>
+                                </li>
+                              ))}
                             </ul>
                           </div>
                         </div>

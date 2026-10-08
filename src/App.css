@@ -166,6 +166,7 @@ img {
   padding-right: 10px;
   background: linear-gradient(0deg,#000,hsla(0,0%,100%,0));
   transition: .25s ease-in;
+  z-index: 30; /* thanh điều khiển và popup nằm trên sub */
 }
 .v-vlite .v-topBar {
   position: absolute;
@@ -381,7 +382,10 @@ img {
   visibility: visible;
 }
 .v-subtitlesList {
-  font-size: calc(var(--font-size, 12px) * 1.1);
+  font-size: calc(var(--font-size, 12px) * 1.15); /* dự phòng cho trình duyệt cũ */
+  max-width: calc(100vw - 20px);
+  max-height: var(--menu-max-h, 70vh);
+  overflow: auto;
   background-color: #fff;
   border-radius: 5px;
   bottom: var(--width-bar);
@@ -391,7 +395,7 @@ img {
   transform: translateX(-50%);
   transition: opacity 0.25s ease, visibility 0.25s ease;
   visibility: hidden;
-  z-index: 3;
+  z-index: 30; /* nổi trên lớp sub tự vẽ (z-index 15) */
 }
 .v-subtitlesList ul {
   margin: 0;
@@ -411,7 +415,7 @@ img {
   font-family: inherit;
   font-size: inherit;
   outline: none;
-  padding: 8px 15px 8px 30px;
+  padding: 0.45em 1em 0.45em 2.2em;
   position: relative;
   text-align: left;
   transition: background-color 0.25s ease;
@@ -423,11 +427,11 @@ img {
 .v-trackButton svg {
   fill: #ff7f15;
   display: none;
-  left: 5px;
+  left: 0.4em;
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 20px;
+  width: 1.3em;
 }
 
 .v-vlite.v-paused:not(.v-firstStart) .v-poster, .v-vlite.v-playing .v-bigPlay, .v-vlite.v-playing .v-poster {
@@ -517,4 +521,15 @@ img {
   width: 100%;
   height: 100%;
   z-index: 10;
+}
+
+/* Popup chọn sub / tốc độ / độ trễ / audio: cỡ chữ theo ĐỘ RỘNG THẬT của khung video (cqw = 1% bề rộng khung),
+   trình duyệt tự cập nhật ngay khi đổi kích thước, không phụ thuộc số đo bằng JS */
+@supports (container-type: inline-size) {
+  #sample_video.v-vlite {
+    container-type: inline-size;
+  }
+  #sample_video .v-subtitlesList {
+    font-size: clamp(9px, 2cqw, 28px);
+  }
 }
