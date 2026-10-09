@@ -3,10 +3,18 @@
   cursor: pointer;
 }
 
+@font-face {
+  font-family: "UVN La Xanh";
+  src: url("./fonts/unicode_display_UVNLaXanh_R.woff") format("woff"),
+       url("./fonts/unicode_display_UVNLaXanh_R.TTF") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 .react-player video::cue{
   font-size: var(--font-size-subtitle);
   font-weight: 700;
-  font-family: Tahoma;
+  font-family: "UVN La Xanh", Tahoma, sans-serif;
   background-color: #000;
   color:gold;
   position:absolute;
@@ -135,7 +143,7 @@ img {
     top: 0;
     left: 0;
     width: 100%;
-    height: calc(100% - var(--width-bar, 50px));
+    height: calc(100% - var(--width-bar, 50px) - var(--bar-gap, 0px));
 }
 .v-vlite a, .v-vlite div, .v-vlite form, .v-vlite label, .v-vlite li, .v-vlite p, .v-vlite span, .v-vlite ul {
   margin: 0;
@@ -173,7 +181,12 @@ img {
   top: 0;
   left: 0;
   width: 100%;
-  height: 35px;
+  height: auto;
+  min-height: calc(var(--font-size-title, 24px) * 1.5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: calc(var(--font-size-title, 24px) * 0.5);
   padding-top: 5px;
   text-align: right;
   padding-left: 15px;
@@ -183,7 +196,19 @@ img {
   text-align: left;
 }
 .v-vlite .v-topBar span {
-  font-size: 24px;
+  font-size: var(--font-size-title, 24px); /* co giãn theo độ rộng khung video */
+}
+.v-vlite .v-topBar .v-topTitle {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* tên dài thì cắt bằng ... thay vì xuống nhiều dòng */
+}
+.v-vlite .v-topBar .v-topTime {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: calc(var(--font-size-title, 24px) * 0.85);
 }
 .v-vlite .v-progressBar {
   position: absolute;
@@ -388,7 +413,7 @@ img {
   overflow: auto;
   background-color: #fff;
   border-radius: 5px;
-  bottom: var(--width-bar);
+  bottom: calc(var(--width-bar) + var(--bar-gap, 0px));
   left: 50%;
   opacity: 0;
   position: absolute;
@@ -531,5 +556,153 @@ img {
   }
   #sample_video .v-subtitlesList {
     font-size: clamp(9px, 2cqw, 28px);
+  }
+}
+
+/* ---- Màn hình cảm ứng (điện thoại / máy tính bảng): dễ bấm hơn ---- */
+@media (pointer: coarse) {
+  .v-vlite {
+    touch-action: manipulation; /* bỏ độ trễ và phóng to khi chạm 2 lần */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Chừa khoảng trống giữa thanh tiến trình và hàng nút để không chạm nhầm */
+  .v-vlite {
+    --bar-gap: 18px;
+  }
+  .v-vlite .v-controlBar {
+    height: calc(var(--width-bar) + var(--bar-gap));
+    padding-top: calc(3px + var(--bar-gap));
+  }
+  /* Thanh tiến trình dày hơn; vùng chạm (input trong suốt) rộng thêm phía trên, phía dưới chỉ 6px
+     nên không lấn xuống hàng nút */
+  .v-vlite .v-progressBar {
+    height: 12px;
+    top: -2px;
+  }
+  .v-vlite .v-progressBar .v-progressInput {
+    top: -18px;
+    height: calc(100% + 24px);
+  }
+  /* Khi thanh điều khiển đã ẩn lúc đang phát thì không nhận chạm nhầm vào nút vô hình */
+  .v-vlite.v-playing .v-controlBar.hidden {
+    pointer-events: none;
+  }
+  /* Mục trong menu (phụ đề, tốc độ, audio, độ trễ) cao tối thiểu 44px */
+  .v-vlite .v-subtitlesList .v-trackButton {
+    min-height: 44px;
+    padding: 10px 18px 10px 34px;
+  }
+}
+
+/* ---- Trang danh sách file trên điện thoại: vừa khít chiều ngang, tên dài tự xuống dòng ---- */
+.App-body {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.App-item a {
+  overflow-wrap: anywhere; /* tên file rất dài không tràn ra ngoài nền tối */
+}
+@media (max-width: 800px) {
+  .App-header {
+    min-height: 100vh;
+    min-height: 100dvh;
+    justify-content: flex-start; /* bắt đầu từ trên, không canh giữa theo chiều dọc */
+    overflow-x: clip; /* không dùng hidden: nó biến header thành khung cuộn và làm hỏng sticky */
+  }
+  /* Danh sách thư mục/file (trang video có style riêng nên không bị ảnh hưởng) */
+  .App-body {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    padding: 12px 12px 32px;
+    font-size: 16px;
+  }
+  .App-item {
+    padding: 9px 0; /* dòng cao hơn cho dễ chạm */
+    display: flex;
+    align-items: flex-start;
+  }
+  .App-item img {
+    flex: none;
+    width: 18px;
+    margin-top: 3px;
+  }
+}
+
+/* ---- Hàng đầu trang: nút quay lại (icon) cùng hàng với đường dẫn mục ---- */
+.App-pathbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.App-back {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: aliceblue;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.App-back svg {
+  width: 26px;
+  height: 26px;
+}
+.App-back:hover,
+.App-back:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  outline: none;
+}
+.App-path {
+  flex: 1;
+  min-width: 0;
+  padding-top: 7px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Điện thoại: hàng nút quay lại + đường dẫn cố định ở đầu màn hình khi cuộn ---- */
+@media (max-width: 800px) {
+  .App-pathbar {
+    position: sticky;
+    top: 0;
+    z-index: 50; /* cao hơn thanh điều khiển video (30) */
+    background: #282c34;
+    padding: 8px 0;
+    margin-bottom: 16px;
+  }
+}
+
+/* Nút Pick thư mục (trang danh sách) */
+.App-pick {
+  margin-left: 12px;
+  padding: 1px 10px;
+  font-size: 0.7em;
+  line-height: 1.6;
+  border-radius: 999px;
+  border: 1px solid #808080;
+  background: transparent;
+  color: #bbb;
+  cursor: pointer;
+  vertical-align: middle;
+  flex: none;
+}
+.App-pick:hover {
+  border-color: #61dafb;
+  color: #61dafb;
+}
+.App-pick.picked {
+  border-color: #ffd700;
+  color: #ffd700;
+}
+@media (max-width: 800px) {
+  .App-pick {
+    padding: 4px 12px;
+    margin-left: auto; /* dòng là flex: đẩy nút về mép phải, dễ chạm */
+    font-size: 0.8em;
   }
 }

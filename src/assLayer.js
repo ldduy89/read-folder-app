@@ -4,15 +4,25 @@ import { ASS_DEFAULT_RES, DEFAULT_ASS_STYLE, parseAssCue, readCueMeta } from "./
 const H_ALIGN = ["left", "center", "right"];
 const TEXT_BOX = "#000"; // nền chữ đen đặc (đổi thành "transparent" nếu muốn bỏ nền)
 
+// Font phụ đề (khai báo @font-face trong App.css)
+const SUB_FONT = '"UVN La Xanh", Tahoma, sans-serif';
+// true: mọi sub dùng font trên; false: sub ASS nào khai báo font riêng thì dùng font đó, font trên chỉ là dự phòng
+const SUB_FONT_FORCE = true;
+// Chiều cao dòng (không đơn vị nên tự co giãn theo cỡ chữ). Mỗi dòng sub có nền đen riêng, vẽ theo chiều cao nội tại của font
+// (font UVN La Xanh: ascent 1.112em + descent 0.251em = 1.363em) cộng padding dọc 2 x 0.04em = 1.443em.
+// Nếu line-height nhỏ hơn số này thì nền đen của dòng dưới đè lên phần đuôi chữ (g, p, y, dấu nặng...) của dòng trên.
+// Đổi font khác thì chỉnh lại số này cho bằng (ascent + descent + 0.08).
+const SUB_LINE_HEIGHT = 1.44;
+
 const segStyle = (seg, sy, resY, wrap) => ({
-  fontFamily: seg.font ? `"${seg.font}", Tahoma, sans-serif` : "Tahoma, sans-serif",
+  fontFamily: SUB_FONT_FORCE || !seg.font ? SUB_FONT : `"${seg.font}", ${SUB_FONT}`,
   fontSize: Math.max((seg.fs || resY / 18) * sy, 8) + "px",
   fontWeight: seg.bold ? 700 : 400,
   fontStyle: seg.italic ? "italic" : "normal",
   textDecoration: [seg.underline && "underline", seg.strike && "line-through"].filter(Boolean).join(" ") || "none",
   color: seg.color,
   background: TEXT_BOX,
-  lineHeight: 1.25,
+  lineHeight: SUB_LINE_HEIGHT,
   padding: "0.04em 0.28em",
   whiteSpace: wrap ? "pre-wrap" : "pre",
   WebkitBoxDecorationBreak: "clone",
@@ -182,8 +192,14 @@ export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
       flexDirection: g.row === 0 ? "column-reverse" : "column"
     };
     if (g.row === 0) {
-      // Dưới: chừa chỗ cho thanh điều khiển của player
-      st.bottom = `calc(var(--width-bar, 50px) + ${mV}px)`;
+      st.transition = "bottom .25s ease-in"; // cùng tốc độ với thanh điều khiển ẩn/hiện
+      if (opts.controlsHidden) {
+        // Thanh điều khiển đã ẩn: hạ phụ đề xuống sát đáy hình (margin theo sub, tối thiểu 4% chiều cao)
+        st.bottom = Math.max(mV, pic.height * 0.04) + "px";
+      } else {
+        // Thanh điều khiển đang hiện: chừa chỗ phía trên nó
+        st.bottom = `calc(var(--width-bar, 50px) + var(--bar-gap, 0px) + ${mV}px)`;
+      }
     } else if (g.row === 2) {
       st.top = mV + "px";
     } else {

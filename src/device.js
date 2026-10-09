@@ -21,3 +21,14 @@ export const isTV = () => {
 
   return false;
 };
+
+// Màn hình cảm ứng là thiết bị chính (điện thoại, máy tính bảng). Ép thủ công bằng ?touch=1 / ?touch=0 (để thử trên máy tính).
+export const isTouch = () => {
+  try {
+    const forced = new URLSearchParams(window.location.search).get("touch");
+    if (forced === "1") return true;
+    if (forced === "0") return false;
+  } catch (e) {}
+  const coarse = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  return coarse && (navigator.maxTouchPoints || 0) > 0;
+};

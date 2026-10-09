@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiểm tra nút remote</title>
+<style>
+  html, body { margin: 0; background: #101418; color: #e8ecef; font-family: Tahoma, Arial, sans-serif; }
+  body { padding: 2vh 3vw; }
+  h1 { font-size: 3.2vh; margin: 0 0 1vh; font-weight: 700; }
+  p { font-size: 2.4vh; margin: 0 0 1.6vh; color: #a9b4bd; line-height: 1.4; }
+  #ua { font-size: 1.9vh; color: #7f8b95; word-break: break-all; margin-bottom: 2vh; }
+  #last { font-size: 5vh; font-weight: 700; padding: 2vh 2vw; background: #1d252c; border-left: 1vh solid #ffd700; margin-bottom: 2vh; min-height: 7vh; }
+  #summary { font-size: 2.6vh; margin-bottom: 2vh; }
+  #log { font-family: Consolas, Menlo, monospace; font-size: 2.3vh; line-height: 1.5; white-space: pre-wrap; }
+  .kd { color: #8be28b; }
+  .mm { color: #8bc8ff; }
+  .ck { color: #ffd166; }
+  .other { color: #d3a8ff; }
+  button { font-size: 2.4vh; padding: 1vh 2vw; margin-top: 2vh; }
+</style>
+</head>
+<body>
+<h1>Kiểm tra nút remote</h1>
+<p>Bấm lần lượt các nút trên remote: mũi tên, OK, Back, Play/Pause, tua, nút màu. Trang sẽ hiện trình duyệt nhận được sự kiện gì và cách nhau bao nhiêu mili giây.</p>
+<p>Để kiểm tra lỗi con trỏ nảy ngược: đưa con trỏ sát mép trái màn hình, bấm Trái một lần và xem các dòng mousemove ngay sau đó (movementX âm rồi dương, cách nhau bao nhiêu ms).</p>
+<div id="ua"></div>
+<div id="last">Chưa nhận được gì</div>
+<div id="summary"></div>
+<div id="log"></div>
+<button id="clear" type="button">Xoá</button>
+
+<script>
+(function () {
+  var logEl = document.getElementById("log");
+  var lastEl = document.getElementById("last");
+  var sumEl = document.getElementById("summary");
+  document.getElementById("ua").textContent = navigator.userAgent;
+
+  var entries = [];
+  var counts = { keydown: 0, mousemove: 0, click: 0, other: 0 };
+  var MAX = 16;
+  var lastTime = 0;
+
+  // Số mili giây kể từ sự kiện trước, để đo TV "nảy ngược" sau bao lâu
+  function dt() {
+    var now = Date.now();
+    var d = lastTime ? now - lastTime : 0;
+    lastTime = now;
+    return "  (+" + d + "ms)";
+  }
+
+  function render() {
+    var html = "";
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      html += '<div class="' + e.cls + '">' + e.text + (e.n > 1 ? "  x" + e.n : "") + "</div>";
+    }
+    logEl.innerHTML = html;
+    sumEl.textContent =
+      "Phím (keydown): " + counts.keydown +
+      "   |   Di chuyển con trỏ (mousemove): " + counts.mousemove +
+      "   |   Click: " + counts.click +
+      "   |   Khác: " + counts.other;
+  }
+
+  function push(type, cls, text, merge) {
+    var top = entries[0];
+    if (merge && top && top.type === type) {
+      top.text = text;
+      top.n++;
+    } else {
+      entries.unshift({ type: type, cls: cls, text: text, n: 1 });
+      if (entries.length > MAX) entries.pop();
+    }
+    lastEl.textContent = text;
+    render();
+  }
+
+  function keyText(ev) {
+    return "keydown  key=" + ev.key + "  code=" + ev.code + "  keyCode=" + ev.keyCode;
+  }
+
+  window.addEventListener("keydown", function (ev) {
+    counts.keydown++;
+    push("keydown", "kd", keyText(ev) + dt(), false);
+    // Chặn hành vi mặc định (cuộn trang, chuyển focus) để xem nút có còn tạo thêm sự kiện con trỏ không
+    ev.preventDefault();
+  }, true);
+
+  window.addEventListener("mousemove", function (ev) {
+    // Bỏ qua rung nhẹ không có chuyển động
+    if (!ev.movementX && !ev.movementY) return;
+    counts.mousemove++;
+    push("mousemove", "mm",
+      "mousemove  x=" + ev.clientX + " y=" + ev.clientY +
+      "  movementX=" + ev.movementX + " movementY=" + ev.movementY + dt(), false);
+  }, true);
+
+  window.addEventListener("click", function (ev) {
+    counts.click++;
+    push("click", "ck", "click  button=" + ev.button + "  x=" + ev.clientX + " y=" + ev.clientY + dt(), false);
+  }, true);
+
+  ["wheel", "contextmenu", "mousedown", "touchstart", "pointerdown", "visibilitychange", "popstate"].forEach(function (name) {
+    window.addEventListener(name, function () {
+      counts.other++;
+      push(name, "other", name, false);
+    }, true);
+  });
+
+  document.getElementById("clear").addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    entries = [];
+    counts = { keydown: 0, mousemove: 0, click: 0, other: 0 };
+    lastEl.textContent = "Chưa nhận được gì";
+    render();
+  }, false);
+
+  render();
+})();
+</script>
+</body>
+</html>

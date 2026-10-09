@@ -8,7 +8,7 @@ import _ from "lodash";
 import Duration from "./Duration";
 import { plainCueText } from "./assText";
 import { buildAssLayer } from "./assLayer";
-import { isTV } from "./device";
+import { isTV, isTouch } from "./device";
 import { Link, useHistory } from "react-router-dom";
 
 const Home = (props) => {
@@ -31,6 +31,7 @@ const Home = (props) => {
   const subtitlesURL = `http://${hostname}:8081/subtitles/`;
   const subtitlesStyleURL = `http://${hostname}:8081/subtitles-style/`;
   const trasksURL = `http://${hostname}:8081/trasks/`;
+  const pickURL = `http://${hostname}:8081/pick/`;
   const audiosURL = `http://${hostname}:8081/audios/`;
   const audioPrepareURL = `http://${hostname}:8081/audio-prepare/`;
   const audioFileURL = `http://${hostname}:8081/audio-file/`;
@@ -73,6 +74,29 @@ const Home = (props) => {
   const [subDelay, setSubDelay] = useState(0); // độ trễ phụ đề (giây). Dương = phụ đề hiện trễ hơn
   // TV: điều khiển kiểu remote (di chuyển chuột để chọn). PC/khác: dùng chuột bình thường.
   const isMouse = !isTV();
+  const touch = isMouse && isTouch(); // điện thoại / máy tính bảng: nút to hơn, chạm hai bên video để tua
+  // Kích thước cửa sổ: màn hình dọc hoặc hẹp thì xếp video ở trên, khung phụ đề ở dưới
+  const [view, setView] = useState({ w: window.innerWidth, h: window.innerHeight });
+  useEffect(() => {
+    const onResize = () => setView({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+  const stacked = isMouse && (view.h > view.w || view.w < 640);
+  // Độ rộng thật của khung chứa video + phụ đề (đo lại khi xoay màn hình / đổi kích thước)
+  const stackRef = useRef(null);
+  const [stackW, setStackW] = useState(0);
+  useEffect(() => {
+    const el = stackRef.current;
+    if (!el) return;
+    const w = el.clientWidth;
+    if (w && w !== stackW) setStackW(w);
+  }, [view.w, view.h, stacked, type, pathViewFile]);
+  const bodyW = stackW || Math.min(view.w * 0.96, 1800);
   const [audioList, setAudioList] = useState([]);
   const [boxAudio, setBoxAudio] = useState(false);
   const [boxSpeed, setBoxSpeed] = useState(false); // menu tốc độ phát
@@ -172,11 +196,13 @@ const Home = (props) => {
         element.classList.remove("s-active");
       }
     }
-    const subFile = document.getElementById(`sub_${indexSub}`);
+    // indexSub: 0..n = cột Sub 1 (Off + n sub), từ n+1 trở đi = cột Sub 2 (Off + các sub còn lại)
+    const subCount = subtitles ? subtitles.length : 0;
+    const subFile = document.getElementById(indexSub <= subCount ? `sub_${indexSub}` : `sub2_${indexSub - subCount - 1}`);
     if (subFile) {
       subFile.classList.add("s-active");
     }
-  }, [indexSub]);
+  }, [indexSub, subtitles]);
 
   useEffect(() => {
     const items = document.getElementsByClassName("a-active");
@@ -666,6 +692,37 @@ const Home = (props) => {
     return () => clearInterval(id);
   }, [subDelay]);
 
+  // ---------- Pick thư mục để hiện ở trang Home ----------
+  // Pick: POST /pick/<đường dẫn thư mục>. Bỏ pick: DELETE /pick/<tên trên Home>.
+  // Cập nhật danh sách tại chỗ (không tải lại) để vị trí đang chọn không bị nhảy về đầu.
+  const encodePath = (p) => p.split("/").map(encodeURIComponent).join("/");
+
+  const togglePick = (folder) => {
+    const isRootList = root === "";
+    const folderPath = _.filter([root, pathName, folder.name], (elm) => !!elm).join("/");
+    const request = folder.picked
+      ? fetch(pickURL + encodeURIComponent(folder.pickedName || folder.name), { method: "DELETE" })
+      : fetch(pickURL + encodePath(folderPath), { method: "POST" });
+    request
+      .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data && data.error);
+        if (folder.picked) {
+          // Bỏ pick: ở Home thì thư mục biến mất khỏi danh sách
+          setFolders((list) =>
+            isRootList
+              ? list.filter((f) => f.name !== folder.name)
+              : list.map((f) => (f.name === folder.name ? { ...f, picked: false, pickedName: undefined } : f))
+          );
+          showToast(`Đã bỏ pick: ${folder.name}`);
+        } else {
+          setFolders((list) => list.map((f) => (f.name === folder.name ? { ...f, picked: true, pickedName: data.name } : f)));
+          showToast(`Đã pick: ${folder.name} (hiện ở trang Home)`);
+        }
+      })
+      .catch(() => showToast("Không pick được thư mục này", 3000));
+  };
+
   const handleActionFile = (fileName, path) => {
     if (fileName) history.replace(`/${[path, fileName].join("/")}?type=file`);
   };
@@ -744,13 +801,26 @@ const Home = (props) => {
 
   const videoH = frameH || (sample_video ? sample_video.offsetHeight : 0);
   const videoW = frameW || (sample_video ? sample_video.offsetWidth : 0);
+  // Cảm ứng + khung hẹp: ẩn nút tua 2 phút (đã có chạm hai bên video) và nút âm lượng (điện thoại có phím cứng),
+  // chuyển chữ thời gian lên thanh tiêu đề để 8 nút còn lại to và dễ bấm
+  const containerW = sample_video ? sample_video.offsetWidth : videoW;
+  const compactTouch = touch && containerW > 0 && containerW < 700;
+  const touchButtons = compactTouch ? 8 : 11; // số nút trên thanh điều khiển
+  const touchTimeW = compactTouch ? 0 : 110; // chỗ chừa cho chữ thời gian trên thanh điều khiển
+  const barPx = touch && containerW
+    ? Math.round(Math.min(Math.max((containerW - 24 - touchTimeW) / (touchButtons + 0.2), 34), 56))
+    : videoW
+    ? Math.round(Math.min(Math.max(videoW / 28, 32), 110))
+    : 50;
   const sizeBar = {
     // Nút điều khiển và chữ thời gian co giãn liên tục theo độ rộng khung video
-    "--width-bar": videoW ? Math.round(Math.min(Math.max(videoW / 28, 32), 110)) + "px" : "50px",
-    "--font-size": videoW ? Math.round(Math.min(Math.max(videoW / 90, 11), 26)) + "px" : "12px",
+    "--width-bar": barPx + "px",
+    "--font-size": videoW ? Math.round(Math.min(Math.max(videoW / 90, touch ? 13 : 11), 26)) + "px" : "12px",
     // Chiều cao tối đa của popup chọn (sub / tốc độ / audio): không cao quá khung video
-    "--menu-max-h": videoH ? Math.max(videoH - Math.round(Math.min(Math.max(videoW / 28, 32), 110)) - 16, 80) + "px" : "70vh",
-    "--font-size-subtitle": videoH ? Math.max(videoH / 18, 14) + "px" : "24px"
+    "--menu-max-h": videoH ? Math.max(videoH - barPx - 16, 80) + "px" : "70vh",
+    "--font-size-subtitle": videoH ? Math.max(videoH / 18, 14) + "px" : "24px",
+    // Tiêu đề video co giãn theo độ rộng khung video
+    "--font-size-title": Math.round(Math.min(Math.max((containerW || videoW || 600) / 40, 14), 40)) + "px"
   };
 
   useEffect(() => {
@@ -868,9 +938,13 @@ const Home = (props) => {
         setIndexFile(newIndex);
       }
     } else {
+      // Danh sách điều hướng: Sub 1 (Off + n sub) rồi tới Sub 2 (Off + các sub khác Sub 1), khi có từ 2 sub trở lên
+      const subCount = subtitles.length;
+      const sub2Count = subCount > 1 ? subtitles.filter((sub) => sub.language !== activeSubLang).length + 1 : 0;
+      const maxIndex = subCount + sub2Count;
       let newIndex = action ? indexSub + 1 : indexSub - 1;
-      if (newIndex < 0) newIndex = subtitles.length;
-      if (newIndex > subtitles.length) newIndex = 0;
+      if (newIndex < 0) newIndex = maxIndex;
+      if (newIndex > maxIndex) newIndex = 0;
       setIndexSub(newIndex);
     }
   };
@@ -1084,15 +1158,83 @@ const Home = (props) => {
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 
+  // ---------- Chạm hai bên video để tua (màn hình cảm ứng) ----------
+  const TAP_ZONE = 0.28; // mỗi bên chiếm 28% bề ngang video
+  const TAP_SEEK = 10; // giây mỗi lần chạm
+  const [tapHint, setTapHint] = useState(null); // { side, total }
+  const tapAccumRef = useRef({ side: "", total: 0, time: 0 });
+  const tapHintTimerRef = useRef(null);
+
+  const tapZoneOf = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / (rect.width || 1);
+    return x < TAP_ZONE ? "left" : x > 1 - TAP_ZONE ? "right" : "center";
+  };
+
+  const handleOverlayTap = (e) => {
+    if (touch) {
+      const zone = tapZoneOf(e);
+      if (zone !== "center") {
+        const now = Date.now();
+        const acc = tapAccumRef.current;
+        // chạm liên tiếp cùng một bên thì cộng dồn số giây hiển thị
+        const total = acc.side === zone && now - acc.time < 900 ? acc.total + TAP_SEEK : TAP_SEEK;
+        tapAccumRef.current = { side: zone, total, time: now };
+        seekBy(zone === "left" ? -TAP_SEEK : TAP_SEEK);
+        setTapHint({ side: zone, total });
+        clearTimeout(tapHintTimerRef.current);
+        tapHintTimerRef.current = setTimeout(() => setTapHint(null), 800);
+        return;
+      }
+    }
+    setStateElm({ playing: !state.playing });
+  };
+
+  const handleOverlayDoubleClick = (e) => {
+    // Chạm 2 lần ở hai bên = tua 2 lần, không bật/tắt full screen
+    if (touch && tapZoneOf(e) !== "center") return;
+    handleFullSreen(!isFullSreen);
+  };
+
+  // ---------- Remote kiểu con trỏ: đọc hướng di chuyển + lọc "nảy ngược" ----------
+  // Khi con trỏ chạm mép màn hình, một số TV đẩy con trỏ ngược lại ngay sau khi nhận nút (vd bấm trái -> sang trái 1 nấc
+  // rồi tự sang phải). Bỏ qua sự kiện ngược chiều trên cùng trục nếu nó xảy ra ngay sau một thao tác.
+  const REMOTE_MIN_MOVE = 5; // px, nhỏ hơn thì coi là nhiễu
+  const REMOTE_BOUNCE_MS = 250; // cửa sổ thời gian để coi sự kiện ngược chiều là "nảy lại"
+  const lastRemoteMoveRef = useRef({ axis: "", dir: 0, time: 0 });
+
+  const readRemoteMove = (event) => {
+    const { movementX, movementY } = event;
+    let axis = "";
+    let value = 0;
+    if (!movementX && movementY && Math.abs(movementY) > REMOTE_MIN_MOVE) {
+      axis = "y";
+      value = movementY;
+    } else if (movementX && !movementY && Math.abs(movementX) > REMOTE_MIN_MOVE) {
+      axis = "x";
+      value = movementX;
+    } else {
+      return null;
+    }
+    const dir = value > 0 ? 1 : -1;
+    const now = Date.now();
+    const last = lastRemoteMoveRef.current;
+    if (last.axis === axis && last.dir === -dir && now - last.time < REMOTE_BOUNCE_MS) {
+      lastRemoteMoveRef.current = { ...last, time: now }; // gia hạn: chuỗi nảy nhiều nhịp vẫn bị bỏ qua
+      return null;
+    }
+    lastRemoteMoveRef.current = { axis, dir, time: now };
+    return { axis, forward: dir > 0 };
+  };
+
   return (
     <>
       <div
         className="App"
         onMouseMove={(event) => {
-          if (!isMouse) {
-            const { movementX, movementY } = event;
-            if (!isFullSreen && !movementX && movementY && (movementY > 5 || movementY < -5)) actionInListFileHandle(movementY > 0);
-            if (!isFullSreen && movementX && !movementY && (movementX > 5 || movementX < -5)) actionInListFileHandle(movementX > 0);
+          if (!isMouse && !isFullSreen) {
+            const move = readRemoteMove(event);
+            if (move) actionInListFileHandle(move.forward);
           }
         }}
         onClick={() => {
@@ -1103,42 +1245,43 @@ const Home = (props) => {
       >
         <header className="App-header">
           <div className="App-body" id="body" style={isMouse && type === "file" ? { width: "96vw", maxWidth: "1800px", height: "auto", overflow: "visible" } : undefined}>
-            <b>
-              {root !== "" ? (
-                <Link id={`path_0`} to="/">
-                  Home
-                </Link>
-              ) : (
-                "Home"
-              )}
-            </b>
-            {fullPathRoot.map((path, index) => {
-              const currentPathArr = _.dropRight(fullPathRoot, fullPathRoot.length - index - 1);
-              return (
-                <b key={index}>
-                  {" / "}
-                  {root !== "" && index + 1 !== fullPathRoot.length && (
-                    <Link id={`path_${index + 1}`} to={`/${currentPathArr.join("/")}`}>
-                      {path}
-                    </Link>
-                  )}
-                  {root !== "" && index + 1 === fullPathRoot.length && path}
-                </b>
-              );
-            })}
-
-            <br />
-            <br />
-            <b>
+            {/* Hàng đầu trang: nút quay lại (icon) + đường dẫn mục. Trang xem file không hiện tên file. */}
+            <div className="App-pathbar">
               {root !== "" && (
-                <Link id={`back_0`} to={`/${backRootPath}`}>
-                  {"< Back"}
+                <Link id={`back_0`} className="App-back" to={`/${backRootPath}`} title="Quay lại" aria-label="Quay lại">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M19 12H5" />
+                    <path d="M11 6l-6 6 6 6" />
+                  </svg>
                 </Link>
               )}
-            </b>
-            <br />
-            <br />
-            <br />
+              <div className="App-path">
+                <b>
+                  {root !== "" ? (
+                    <Link id={`path_0`} to="/">
+                      Home
+                    </Link>
+                  ) : (
+                    "Home"
+                  )}
+                </b>
+                {(type === "file" ? _.dropRight(fullPathRoot) : fullPathRoot).map((path, index, crumbs) => {
+                  const currentPathArr = _.dropRight(fullPathRoot, fullPathRoot.length - index - 1);
+                  const isCurrent = type !== "file" && index + 1 === crumbs.length; // thư mục đang mở: chỉ hiện chữ
+                  return (
+                    <b key={index}>
+                      {" / "}
+                      {root !== "" && !isCurrent && (
+                        <Link id={`path_${index + 1}`} to={`/${currentPathArr.join("/")}`}>
+                          {path}
+                        </Link>
+                      )}
+                      {root !== "" && isCurrent && path}
+                    </b>
+                  );
+                })}
+              </div>
+            </div>
             {type !== "file" ? (
               folders.map((folder, index) => {
                 const fullPath = _.filter([root, pathName, folder.name], (elm) => !!elm).join("/");
@@ -1146,19 +1289,54 @@ const Home = (props) => {
                   <div className={`App-item ${indexFile === index ? "f-active" : ""}`} id={`file_${index}`} key={index}>
                     <img src={folder.type === "file" ? fileIcon : folderIcon} alt="icon" />
                     <Link to={`/${fullPath}${folder.type === "file" ? "?type=file" : ""}`}>{folder.name}</Link>
+                    {/* Home: ổ đĩa không có nút, thư mục đã pick có nút "Bỏ pick". Trong thư mục: thư mục con có nút Pick. TV (remote) không hiện nút. */}
+                    {isMouse && folder.type === "folder" && (root !== "" || folder.picked) && (
+                      <button
+                        type="button"
+                        className={`App-pick ${folder.picked ? "picked" : ""}`}
+                        title={folder.picked ? "Bỏ pick (xoá khỏi trang Home)" : "Pick để hiện ở trang Home"}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          togglePick(folder);
+                        }}
+                      >
+                        {folder.picked ? (root === "" ? "Bỏ pick" : "Đã pick ✓") : "Pick"}
+                      </button>
+                    )}
                   </div>
                 );
               })
             ) : (
-              <div style={isMouse ? { display: "flex", gap: "12px", alignItems: "flex-start" } : undefined}>
-                <div className="player-wrapper" style={isMouse ? { height: "80vh", flex: 1, minWidth: 0 } : undefined}>
+              <div
+                ref={stackRef}
+                style={
+                  isMouse
+                    ? stacked
+                      ? { display: "flex", flexDirection: "column", gap: "12px", width: "100%" }
+                      : { display: "flex", gap: "12px", alignItems: "flex-start" }
+                    : undefined
+                }
+              >
+                <div
+                  className="player-wrapper"
+                  style={
+                    isMouse
+                      ? stacked
+                        ? { width: "100%", height: Math.round((bodyW * 9) / 16) + "px" } // video 16:9 chiếm hết bề ngang
+                        : { height: "80vh", flex: 1, minWidth: 0 }
+                      : undefined
+                  }
+                >
                   <div
                     onMouseMove={(event) => {
                       handleAutoHide();
-                      if (!isMouse) {
-                        const { movementX, movementY } = event;
-                        if (isFullSreen && !movementX && movementY && (movementY > 5 || movementY < -5)) upDownVideoHandle(movementY > 0);
-                        if (isFullSreen && movementX && !movementY && (movementX > 5 || movementX < -5)) leftRightVideoHandle(movementX > 0);
+                      if (!isMouse && isFullSreen) {
+                        const move = readRemoteMove(event);
+                        if (move) {
+                          if (move.axis === "y") upDownVideoHandle(move.forward);
+                          else leftRightVideoHandle(move.forward);
+                        }
                       }
                     }}
                     onClick={() => {
@@ -1224,7 +1402,7 @@ const Home = (props) => {
                       />
                     )}
 
-                    {buildAssLayer(liveCues, assMeta, picRect, { secondary: secLang ? liveCues2 : [], onGrab: () => state.playing && setStateElm({ playing: false }) })}
+                    {buildAssLayer(liveCues, assMeta, picRect, { secondary: secLang ? liveCues2 : [], controlsHidden: hide && state.playing, onGrab: () => state.playing && setStateElm({ playing: false }) })}
 
                     {!!toast && (
                       <div
@@ -1246,12 +1424,39 @@ const Home = (props) => {
                     )}
                     <div className={`v-topBar ${hide ? "hidden" : ""}`}>
                       <span className="v-topTitle">{fileName}</span>
+                      {compactTouch && (
+                        <span className="v-topTime">
+                          <Duration seconds={state.duration * (state.seeking ? state.seekingLine : state.played)}></Duration>
+                          &nbsp;/&nbsp;
+                          <Duration seconds={state.duration}></Duration>
+                        </span>
+                      )}
                     </div>
                     <div
                       className="v-overlayVideo"
-                      onClick={() => setStateElm({ playing: !state.playing })}
-                      onDoubleClick={() => handleFullSreen(!isFullSreen)}
+                      onClick={handleOverlayTap}
+                      onDoubleClick={handleOverlayDoubleClick}
                     ></div>
+                    {touch && tapHint && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "45%",
+                          [tapHint.side === "left" ? "left" : "right"]: "10%",
+                          transform: "translateY(-50%)",
+                          zIndex: 20,
+                          padding: "0.5em 1em",
+                          borderRadius: "999px",
+                          background: "rgba(0,0,0,0.65)",
+                          color: "#fff",
+                          fontSize: "calc(var(--font-size) * 1.6)",
+                          whiteSpace: "nowrap",
+                          pointerEvents: "none"
+                        }}
+                      >
+                        {tapHint.side === "left" ? `« ${tapHint.total} giây` : `${tapHint.total} giây »`}
+                      </div>
+                    )}
                     <button className="v-bigPlay v-controlButton" aria-label="Play" onClick={() => setStateElm({ playing: !state.playing })}>
                       <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                         <path d="M10 0C4.48 0 0 4.48 0 10s4.48 10 10 10 10-4.48 10-10S15.52 0 10 0ZM7.5 12.67V7.33c0-.79.88-1.27 1.54-.84l4.15 2.67a1 1 0 0 1 0 1.68l-4.15 2.67c-.66.43-1.54-.05-1.54-.84Z"></path>
@@ -1283,7 +1488,7 @@ const Home = (props) => {
                             </svg>
                           </span>
                         </div>
-                        <div className="v-playPauseButton" id="play_2" onClick={() => handleChangeSeek(false, 120)}>
+                        <div className="v-playPauseButton" id="play_2" style={compactTouch ? { display: "none" } : undefined} onClick={() => handleChangeSeek(false, 120)}>
                           <span className="v-nextIcon v-iconNext">
                             <svg version="1.1" viewBox="0 0 36 36">
                               <path d="M18.293 11.562v5.852l5.852-5.852v12.875l-5.852-5.852v5.852l-6.438-6.438z"></path>
@@ -1303,7 +1508,7 @@ const Home = (props) => {
                             </svg>
                           </span>
                         </div>
-                        <div className="v-playPauseButton" id="play_4" onClick={() => handleChangeSeek(true, 120)}>
+                        <div className="v-playPauseButton" id="play_4" style={compactTouch ? { display: "none" } : undefined} onClick={() => handleChangeSeek(true, 120)}>
                           <span className="v-nextIcon v-iconNext">
                             <svg version="1.1" viewBox="0 0 36 36">
                               <path d="M17.707 11.562v5.852l-5.852-5.852v12.875l5.852-5.852v5.852l6.438-6.438z"></path>
@@ -1317,7 +1522,7 @@ const Home = (props) => {
                             </svg>
                           </span>
                         </div>
-                        <div className="v-time">
+                        <div className="v-time" style={compactTouch ? { display: "none" } : undefined}>
                           <span className="v-currentTime">
                             <Duration seconds={state.duration * (state.seeking ? state.seekingLine : state.played)}></Duration>
                           </span>
@@ -1377,7 +1582,7 @@ const Home = (props) => {
                                 <li style={{ padding: "0.6em 1em 0.2em 2.2em", color: "#777", fontSize: "0.8em", pointerEvents: "none", whiteSpace: "nowrap" }}>
                                   Sub 2
                                 </li>
-                                <li onClick={() => chooseSecondSub(null)}>
+                                <li id="sub2_0" onClick={() => chooseSecondSub(null)}>
                                   <button className={`v-trackButton ${!secLang ? "v-active" : ""}`} data-language="off">
                                     <svg viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
                                       <path d="M5.6 10.6 1.4 6.4 0 7.8l5.6 5.6 12-12L16.2 0z"></path>
@@ -1388,7 +1593,7 @@ const Home = (props) => {
                                 {subtitles
                                   .filter((sub) => sub.language !== activeSubLang)
                                   .map((sub, index) => (
-                                    <li onClick={() => chooseSecondSub(sub.language)} key={`s2_${index}`}>
+                                    <li id={`sub2_${index + 1}`} onClick={() => chooseSecondSub(sub.language)} key={`s2_${index}`}>
                                       <button className={`v-trackButton ${secLang === sub.language ? "v-active" : ""}`} data-language="off">
                                         <svg viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
                                           <path d="M5.6 10.6 1.4 6.4 0 7.8l5.6 5.6 12-12L16.2 0z"></path>
@@ -1504,7 +1709,7 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_9" onClick={() => setStateElm({ muted: !state.muted })}>
+                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_9" style={compactTouch ? { display: "none" } : undefined} onClick={() => setStateElm({ muted: !state.muted })}>
                           <span className="v-playerIcon v-iconVolumeHigh">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <path
@@ -1570,9 +1775,9 @@ const Home = (props) => {
                     onMouseDown={() => (userScrollRef.current = Date.now())}
                     onTouchStart={() => (userScrollRef.current = Date.now())}
                     style={{
-                      width: "360px",
+                      width: stacked ? "100%" : "min(360px, 40vw)",
                       flexShrink: 0,
-                      height: "80vh",
+                      height: stacked ? "50vh" : "80vh",
                       overflowY: "auto",
                       position: "relative",
                       background: "#141414",
@@ -1640,9 +1845,6 @@ const Home = (props) => {
                 )}
               </div>
             )}
-            <br />
-            <br />
-            <b>{root !== "" && <Link to={`/${backRootPath}`}>{"< Back"}</Link>}</b>
           </div>
         </header>
       </div>
