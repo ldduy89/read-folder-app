@@ -316,7 +316,7 @@ const Home = (props) => {
   };
 
   const boxAudioHandle = () => {
-    if (_.isEmpty(audioList)) return;
+    if (_.isEmpty(audioList) && !isMouse) return; // PC/điện thoại: popup còn có nút tắt âm nên vẫn mở
     if (!boxAudio) {
       setIndexAudio(Math.max(_.findIndex(audioList, (a) => a.enabled), 0));
       setBoxTracks(false);
@@ -805,7 +805,7 @@ const Home = (props) => {
   // chuyển chữ thời gian lên thanh tiêu đề để 8 nút còn lại to và dễ bấm
   const containerW = sample_video ? sample_video.offsetWidth : videoW;
   const compactTouch = touch && containerW > 0 && containerW < 700;
-  const touchButtons = compactTouch ? 8 : 11; // số nút trên thanh điều khiển
+  const touchButtons = compactTouch ? 7 : 9; // số nút trên thanh điều khiển
   const touchTimeW = compactTouch ? 0 : 110; // chỗ chừa cho chữ thời gian trên thanh điều khiển
   const barPx = touch && containerW
     ? Math.round(Math.min(Math.max((containerW - 24 - touchTimeW) / (touchButtons + 0.2), 34), 56))
@@ -1172,6 +1172,9 @@ const Home = (props) => {
   };
 
   const handleOverlayTap = (e) => {
+    // Bấm ra ngoài chữ sub (phát / tạm dừng): bỏ tô đen từ đang chọn
+    const sel = window.getSelection && window.getSelection();
+    if (sel && sel.rangeCount) sel.removeAllRanges();
     if (touch) {
       const zone = tapZoneOf(e);
       if (zone !== "center") {
@@ -1359,7 +1362,7 @@ const Home = (props) => {
                       }
                     }}
                     id="sample_video"
-                    className={`v-vlite ${state.playing ? "v-playing" : "v-paused"} ${hide ? "nocursor" : ""}`}
+                    className={`v-vlite ${state.playing ? "v-playing" : "v-paused"} ${hide ? "nocursor" : ""} ${isMouse ? "" : "v-remote"}`}
                     style={sizeBar}
                   >
                     {!isMouse && <div className="mang"></div>}
@@ -1408,8 +1411,8 @@ const Home = (props) => {
                       <div
                         style={{
                           position: "absolute",
-                          top: "8%",
-                          right: "4%",
+                          top: "12px",
+                          right: "12px",
                           zIndex: 20,
                           padding: "8px 16px",
                           borderRadius: 6,
@@ -1550,8 +1553,12 @@ const Home = (props) => {
                           </span>
                           <div className={`v-subtitlesList ${boxTracks ? "v-active" : ""}`}>
                             <div style={{ display: "flex", alignItems: "flex-start" }}>
-                            <ul>
-                              <li style={{ padding: "0.6em 1em 0.2em 2.2em", color: "#777", fontSize: "0.8em", pointerEvents: "none", whiteSpace: "nowrap" }}>Sub 1</li>
+                            <ul className="v-subCol">
+                              <li className="v-subHead"><svg className="v-ccIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <rect x="2.5" y="5" width="19" height="14" rx="3" />
+                                  <path d="M10.6 10.2a2.2 2.2 0 1 0 0 3.6" />
+                                  <path d="M17.6 10.2a2.2 2.2 0 1 0 0 3.6" />
+                                </svg>Sub 1</li>
                               <li id={`sub_0`} onClick={() => changeSubtitle(null)}>
                                 <button
                                   className={`v-trackButton ${!subtitles || !subtitles.find((s) => !!s.default) ? "v-active" : ""}`}
@@ -1578,10 +1585,12 @@ const Home = (props) => {
                                 })}
                             </ul>
                             {subtitles && subtitles.length > 1 && (
-                              <ul style={{ borderLeft: "1px solid #ddd" }}>
-                                <li style={{ padding: "0.6em 1em 0.2em 2.2em", color: "#777", fontSize: "0.8em", pointerEvents: "none", whiteSpace: "nowrap" }}>
-                                  Sub 2
-                                </li>
+                              <ul className="v-subCol">
+                                <li className="v-subHead"><svg className="v-ccIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <rect x="2.5" y="5" width="19" height="14" rx="3" />
+                                  <path d="M10.6 10.2a2.2 2.2 0 1 0 0 3.6" />
+                                  <path d="M17.6 10.2a2.2 2.2 0 1 0 0 3.6" />
+                                </svg>Sub 2</li>
                                 <li id="sub2_0" onClick={() => chooseSecondSub(null)}>
                                   <button className={`v-trackButton ${!secLang ? "v-active" : ""}`} data-language="off">
                                     <svg viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
@@ -1605,6 +1614,30 @@ const Home = (props) => {
                               </ul>
                             )}
                             </div>
+                            {/* Chỉnh độ trễ phụ đề: lùi / tới / reset (PC + điện thoại; TV dùng nút đồng hồ riêng) */}
+                            {isMouse && (
+                              <div className="v-delayBar" onClick={(e) => e.stopPropagation()}>
+                                <button type="button" className="v-delayBtn" title="Phụ đề hiện sớm hơn 0.1s (phím G)" onClick={() => changeSubDelay(-SUB_DELAY_STEP)}>
+                                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M16 5.5v13a1 1 0 0 1-1.55.83l-9.6-6.5a1 1 0 0 1 0-1.66l9.6-6.5A1 1 0 0 1 16 5.5z" />
+                                  </svg>
+                                  −0.1s
+                                </button>
+                                <button type="button" className="v-delayBtn" title="Phụ đề hiện trễ hơn 0.1s (phím H)" onClick={() => changeSubDelay(SUB_DELAY_STEP)}>
+                                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M8 5.5v13a1 1 0 0 0 1.55.83l9.6-6.5a1 1 0 0 0 0-1.66l-9.6-6.5A1 1 0 0 0 8 5.5z" />
+                                  </svg>
+                                  +0.1s
+                                </button>
+                                <button type="button" className="v-delayBtn" title="Đặt lại độ trễ" onClick={() => changeSubDelay(null)}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M20 12a8 8 0 1 1-2.6-5.9" />
+                                    <path d="M20 4v5h-5" />
+                                  </svg>
+                                  Reset ({formatDelay(subDelay)})
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className={`v-subtitle`} id="play_speed" onClick={() => boxSpeedHandle()}>
@@ -1644,7 +1677,7 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_7" onClick={() => boxDelayHandle()}>
+                        <div className={`v-subtitle`} id="play_7" style={isMouse ? { display: "none" } : undefined} onClick={() => boxDelayHandle()}>
                           <span className="v-subIcon">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.isEmpty(subtitles) ? "0.3" : "1"}`}>
                               <path
@@ -1662,7 +1695,7 @@ const Home = (props) => {
                                   changeSubDelay(SUB_DELAY_STEP);
                                 }}
                               >
-                                <button className="v-trackButton">Trễ hơn (+0.1s)</button>
+                                <button className="v-trackButton v-action">Trễ hơn (+0.1s)</button>
                               </li>
                               <li
                                 id="del_1"
@@ -1671,7 +1704,7 @@ const Home = (props) => {
                                   changeSubDelay(-SUB_DELAY_STEP);
                                 }}
                               >
-                                <button className="v-trackButton">Sớm hơn (-0.1s)</button>
+                                <button className="v-trackButton v-action">Sớm hơn (-0.1s)</button>
                               </li>
                               <li
                                 id="del_2"
@@ -1680,21 +1713,21 @@ const Home = (props) => {
                                   changeSubDelay(null);
                                 }}
                               >
-                                <button className="v-trackButton">Đặt lại độ trễ ({formatDelay(subDelay)})</button>
+                                <button className="v-trackButton v-action">Đặt lại độ trễ ({formatDelay(subDelay)})</button>
                               </li>
                             </ul>
                           </div>
                         </div>
                         <div className={`v-subtitle`} id="play_8" onClick={() => boxAudioHandle()}>
                           <span className="v-subIcon">
-                            <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.size(audioList) > 1 ? "1" : "0.3"}`}>
+                            <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.size(audioList) > 1 || isMouse ? "1" : "0.3"}`}>
                               <path
                                 d="M18,8 C12.5,8 8,12.5 8,18 L8,24 C8,25.1 8.9,26 10,26 L12,26 L12,19 L10,19 C10,14.6 13.6,11 18,11 C22.4,11 26,14.6 26,19 L24,19 L24,26 L26,26 C27.1,26 28,25.1 28,24 L28,18 C28,12.5 23.5,8 18,8 Z"
                                 fill="#fff"
                               ></path>
                             </svg>
                           </span>
-                          <div className={`v-subtitlesList ${boxAudio ? "v-active" : ""}`}>
+                          <div className={`v-subtitlesList v-popRight ${boxAudio ? "v-active" : ""}`}>
                             <ul>
                               {audioList.map((audio, index) => (
                                 <li id={`aud_${index}`} onClick={() => changeAudio(index)} key={index}>
@@ -1707,9 +1740,34 @@ const Home = (props) => {
                                 </li>
                               ))}
                             </ul>
+                            {isMouse && (
+                              <div className="v-delayBar v-muteBar" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  className={`v-delayBtn v-muteBtn ${state.muted ? "on" : ""}`}
+                                  title="Bật / tắt âm (phím M)"
+                                  aria-pressed={state.muted}
+                                  onClick={() => {
+                                    setStateElm({ muted: !state.muted });
+                                    handleAutoHide();
+                                  }}
+                                >
+                                  {state.muted ? (
+                                    <svg viewBox="0 0 36 36" fill="currentColor" aria-hidden="true">
+                                      <path d="m 21.48,17.98 c 0,-1.77 -1.02,-3.29 -2.5,-4.03 v 2.21 l 2.45,2.45 c .03,-0.2 .05,-0.41 .05,-0.63 z m 2.5,0 c 0,.94 -0.2,1.82 -0.54,2.64 l 1.51,1.51 c .66,-1.24 1.03,-2.65 1.03,-4.15 0,-4.28 -2.99,-7.86 -7,-8.76 v 2.05 c 2.89,.86 5,3.54 5,6.71 z M 9.25,8.98 l -1.27,1.26 4.72,4.73 H 7.98 v 6 H 11.98 l 5,5 v -6.73 l 4.25,4.25 c -0.67,.52 -1.42,.93 -2.25,1.18 v 2.06 c 1.38,-0.31 2.63,-0.95 3.69,-1.81 l 2.04,2.05 1.27,-1.27 -9,-9 -7.72,-7.72 z m 7.72,.99 -2.09,2.08 2.09,2.09 V 9.98 z" />
+                                    </svg>
+                                  ) : (
+                                    <svg viewBox="0 0 36 36" fill="currentColor" aria-hidden="true">
+                                      <path d="M8,21 L12,21 L17,26 L17,10 L12,15 L8,15 L8,21 Z M19,14 L19,22 C20.48,21.32 21.5,19.77 21.5,18 C21.5,16.26 20.48,14.74 19,14 ZM19,11.29 C21.89,12.15 24,14.83 24,18 C24,21.17 21.89,23.85 19,24.71 L19,26.77 C23.01,25.86 26,22.28 26,18 C26,13.72 23.01,10.14 19,9.23 L19,11.29 Z" />
+                                    </svg>
+                                  )}
+                                  {state.muted ? "Đang tắt âm - bấm để bật" : "Tắt âm"}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_9" style={compactTouch ? { display: "none" } : undefined} onClick={() => setStateElm({ muted: !state.muted })}>
+                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_9" style={isMouse ? { display: "none" } : undefined} onClick={() => setStateElm({ muted: !state.muted })}>
                           <span className="v-playerIcon v-iconVolumeHigh">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <path

@@ -407,7 +407,7 @@ img {
   visibility: visible;
 }
 .v-subtitlesList {
-  font-size: calc(var(--font-size, 12px) * 1.15); /* dự phòng cho trình duyệt cũ */
+  font-size: calc(var(--font-size, 12px) * 0.9); /* dự phòng cho trình duyệt cũ */
   max-width: calc(100vw - 20px);
   max-height: var(--menu-max-h, 70vh);
   overflow: auto;
@@ -555,7 +555,7 @@ img {
     container-type: inline-size;
   }
   #sample_video .v-subtitlesList {
-    font-size: clamp(9px, 2cqw, 28px);
+    font-size: clamp(10px, 1.3cqw, 18px);
   }
 }
 
@@ -705,4 +705,179 @@ img {
     margin-left: auto; /* dòng là flex: đẩy nút về mép phải, dễ chạm */
     font-size: 0.8em;
   }
+}
+
+/* ===== Popup chọn sub / tốc độ / audio: thẻ sáng, hàng bo tròn, ô tròn chọn bên phải ===== */
+/* (.v-vlite div/ul/li ở trên đặt padding:0 border:0 nên các luật dưới đây phải có .v-vlite để thắng) */
+.v-vlite .v-subtitlesList {
+  box-sizing: border-box;
+  padding: 0.8em 0.8em 0.7em;
+  background: rgba(250, 250, 252, 0.98);
+  color: #1b2233;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  scrollbar-width: thin;
+}
+.v-subtitlesList ul {
+  min-width: 10em;
+}
+.v-subtitlesList li {
+  margin-bottom: 0.3em;
+}
+.v-subtitlesList .v-trackButton {
+  display: block;
+  width: 100%;
+  color: #1b2233;
+  background: #f3f4f6;
+  border-radius: 10px;
+  padding: 0.6em 2.8em 0.6em 1em;
+  white-space: nowrap;
+}
+.v-subtitlesList .v-trackButton svg {
+  display: none !important; /* dấu tick cũ: thay bằng ô tròn bên phải */
+}
+.v-subtitlesList .v-trackButton::after {
+  content: "";
+  position: absolute;
+  right: 0.8em;
+  top: 50%;
+  width: 1.2em;
+  height: 1.2em;
+  box-sizing: border-box;
+  transform: translateY(-50%);
+  border: 2px solid #c8ccd4;
+  border-radius: 50%;
+}
+.v-subtitlesList .v-trackButton.v-active::after {
+  border-color: #1f5eff;
+  background: #1f5eff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 72% no-repeat;
+}
+.v-subtitlesList .v-trackButton.v-action {
+  padding-right: 1.1em;
+}
+.v-subtitlesList .v-trackButton.v-action::after {
+  display: none;
+}
+.v-subtitlesList .v-trackButton:hover {
+  background: #eceef3;
+}
+.v-subtitlesList .v-trackButton.v-active {
+  color: #0f1a33;
+  font-weight: 600;
+  background: #e6eeff;
+}
+.v-remote .v-subtitlesList .s-active > .v-trackButton,
+.v-remote .v-subtitlesList .a-active > .v-trackButton,
+.v-remote .v-subtitlesList .d-active > .v-trackButton {
+  box-shadow: inset 0 0 0 2px #1f5eff; /* ô đang trỏ tới khi dùng remote / phím */
+}
+.v-subtitlesList .s-active,
+.v-subtitlesList .a-active,
+.v-subtitlesList .d-active {
+  background: transparent;
+}
+.v-vlite .v-subtitlesList .v-subCol {
+  padding: 0 0.45em;
+}
+.v-vlite .v-subtitlesList .v-subCol:first-child {
+  padding-left: 0;
+}
+.v-vlite .v-subtitlesList .v-subCol:last-child {
+  padding-right: 0;
+}
+.v-vlite .v-subtitlesList .v-subCol + .v-subCol {
+  margin-left: 0.45em;
+  padding-left: 0.9em;
+  border-left: 1px solid #e6e8ec;
+}
+.v-vlite .v-subHead {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.2em 0.3em 0.6em;
+  color: #46557a;
+  font-size: 1em;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.v-ccIcon {
+  width: 1.4em;
+  height: 1.4em;
+  flex: none;
+}
+
+/* Chỉnh độ trễ phụ đề (cuối popup chọn sub) */
+.v-vlite .v-delayBar {
+  display: flex;
+  gap: 0.4em;
+  margin-top: 0.3em;
+  padding: 0.8em 0 0;
+  border-top: 1px solid #e6e8ec;
+}
+.v-delayBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0.5em 0.8em;
+  background: #f0f1f4;
+  border: none;
+  border-radius: 999px;
+  color: #1b2233;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95em;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+.v-delayBtn svg {
+  width: 1.2em;
+  height: 1.2em;
+  flex: none;
+  color: #2b4a7e;
+}
+.v-delayBtn:hover {
+  background: #e4e6ec;
+}
+.v-delayBtn:active {
+  transform: scale(0.97);
+}
+@media (pointer: coarse) {
+  .v-vlite .v-subtitlesList .v-trackButton {
+    min-height: 44px;
+    padding: 10px 44px 10px 16px;
+  }
+  .v-vlite .v-subtitlesList .v-trackButton.v-action {
+    padding-right: 16px;
+  }
+  .v-vlite .v-delayBtn {
+    min-height: 44px;
+  }
+}
+
+/* Nút tắt âm ở cuối popup audio */
+.v-vlite .v-muteBar .v-muteBtn {
+  justify-content: flex-start;
+  padding-left: 1em;
+}
+.v-vlite .v-muteBar .v-muteBtn.on {
+  background: #e6eeff;
+  color: #0f1a33;
+  font-weight: 600;
+}
+.v-vlite .v-muteBar .v-muteBtn.on svg {
+  color: #1f5eff;
+}
+
+/* Popup audio nằm gần mép phải khung video: canh theo mép phải của nút (không canh giữa) để không bị cắt khi full màn hình */
+.v-vlite .v-subtitlesList.v-popRight {
+  left: auto;
+  right: 0;
+  transform: none;
 }
