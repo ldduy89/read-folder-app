@@ -573,15 +573,15 @@ img {
     height: calc(var(--width-bar) + var(--bar-gap));
     padding-top: calc(3px + var(--bar-gap));
   }
-  /* Thanh tiến trình dày hơn; vùng chạm (input trong suốt) rộng thêm phía trên, phía dưới chỉ 6px
-     nên không lấn xuống hàng nút */
+  /* Thanh tiến trình dày hơn (12px) */
   .v-vlite .v-progressBar {
     height: 12px;
     top: -2px;
   }
+  /* Vùng chạm của thanh thời lượng bằng đúng phần nhìn thấy (trước đây kéo cao thêm 24px nên chạm gần thanh là tua nhầm) */
   .v-vlite .v-progressBar .v-progressInput {
-    top: -18px;
-    height: calc(100% + 24px);
+    top: 0;
+    height: 100%;
   }
   /* Khi thanh điều khiển đã ẩn lúc đang phát thì không nhận chạm nhầm vào nút vô hình */
   .v-vlite.v-playing .v-controlBar.hidden {
@@ -663,18 +663,6 @@ img {
   padding-top: 7px;
   line-height: 1.3;
   overflow-wrap: anywhere;
-}
-
-/* ---- Điện thoại: hàng nút quay lại + đường dẫn cố định ở đầu màn hình khi cuộn ---- */
-@media (max-width: 800px) {
-  .App-pathbar {
-    position: sticky;
-    top: 0;
-    z-index: 50; /* cao hơn thanh điều khiển video (30) */
-    background: #282c34;
-    padding: 8px 0;
-    margin-bottom: 16px;
-  }
 }
 
 /* Nút Pick thư mục (trang danh sách) */
@@ -880,4 +868,70 @@ img {
   left: auto;
   right: 0;
   transform: none;
+}
+
+
+/* Nút ở góc phải trên của thanh đường dẫn: từ đã lưu + cấu hình dịch */
+.App-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.App-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: #fff;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+}
+.App-tool:hover,
+.App-tool:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+/* ---- Điện thoại / màn hình hẹp hoặc thấp (điện thoại nằm ngang): thanh trên cùng gọn, không cố định khi cuộn ----
+   Đặt cuối file để thắng các luật .App-tool ở trên (cùng độ ưu tiên thì luật nằm sau thắng) */
+@media (max-width: 900px), (max-height: 520px) {
+  .App-pathbar {
+    position: static;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    margin-bottom: 8px;
+  }
+  .App-back {
+    width: 34px;
+    height: 34px;
+  }
+  .App-back svg {
+    width: 22px;
+    height: 22px;
+  }
+  .App-path {
+    padding-top: 0;
+    font-size: 15px;
+  }
+  .App-tools {
+    gap: 6px;
+  }
+  .App-tool {
+    box-sizing: border-box;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+    font-size: 17px;
+    border-radius: 50%;
+  }
+  .App-toolLabel {
+    display: none;
+  }
 }

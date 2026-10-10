@@ -7,7 +7,9 @@ import ReactPlayer from "react-player";
 import _ from "lodash";
 import Duration from "./Duration";
 import { plainCueText } from "./assText";
-import { buildAssLayer } from "./assLayer";
+import { buildAssLayer, buildSavedMatcher, highlightSaved, hoverSavedHandlers } from "./assLayer";
+import { getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
+import TranslatePopup from "./translatePopup";
 import { isTV, isTouch } from "./device";
 import { Link, useHistory } from "react-router-dom";
 
@@ -62,6 +64,47 @@ const Home = (props) => {
   const [folders, setFolders] = useState([]);
   const [filesOfParent, setFilesOfParent] = useState([]);
   const [subtitles, setSubtitles] = useState(null);
+  const [trWord, setTrWord] = useState(null); // { text, anchor, id } từ / đoạn sub đang dịch
+  // Mở cửa sổ dịch cho một từ / đoạn (bấm chọn, rê chuột lên từ đã lưu, Ctrl+C+C)
+  const openTranslate = (text, anchor, meta) => text && setTrWord({ text, anchor, id: Date.now(), hoverId: meta && meta.hoverId });
+  // Từ đã lưu -> tô sáng trong sub; cập nhật ngay khi lưu / xoá từ (cả ở tab khác)
+  const [savedSrcs, setSavedSrcs] = useState(() => getWords().map((w) => w.src));
+  const savedMatcher = React.useMemo(() => buildSavedMatcher(savedSrcs), [savedSrcs]);
+  useEffect(() => {
+    const refresh = () => setSavedSrcs(getWords().map((w) => w.src));
+    const onStorage = (e) => {
+      if (!e.key || e.key === WORDS_KEY) refresh();
+    };
+    window.addEventListener(WORDS_EVENT, refresh);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(WORDS_EVENT, refresh);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  // Nhấn Ctrl+C (Cmd+C trên Mac) hai lần trong 600ms khi đang bôi đen chữ -> dịch đoạn đang chọn (giống chế độ Ctrl+C+C của extension)
+  useEffect(() => {
+    let last = 0;
+    const onKey = (e) => {
+      if (e.repeat || e.altKey || e.shiftKey || !(e.ctrlKey || e.metaKey) || e.code !== "KeyC") return;
+      const tag = e.target && e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const now = Date.now();
+      if (now - last > 600) {
+        last = now;
+        return;
+      }
+      last = 0;
+      const sel = window.getSelection && window.getSelection();
+      const text = sel && sel.rangeCount ? sel.toString().trim() : "";
+      if (!text) return;
+      const r = sel.getRangeAt(0).getBoundingClientRect();
+      setTrWord({ text: text.slice(0, 1000), anchor: { x: r.left, y: r.bottom, top: r.top }, id: Date.now() });
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, []);
   const [fileName, setFileName] = useState("");
   const [nextFile, setNextFile] = useState("");
   const [previousFile, setPreviousFile] = useState("");
@@ -1284,6 +1327,18 @@ const Home = (props) => {
                   );
                 })}
               </div>
+              {isMouse && (
+                <div className="App-tools">
+                  <a className="App-tool" href="/translate-words" target="_blank" rel="noopener noreferrer" title="Danh sách từ đã lưu" aria-label="Từ đã lưu">
+                    <span aria-hidden="true">★</span>
+                    <span className="App-toolLabel">Từ đã lưu</span>
+                  </a>
+                  <a className="App-tool" href="/translate-words?settings=1" target="_blank" rel="noopener noreferrer" title="Cấu hình dịch: ngôn ngữ, Gemini, đồng bộ Google Sheet" aria-label="Cấu hình dịch">
+                    <span aria-hidden="true">⚙</span>
+                    <span className="App-toolLabel">Cấu hình dịch</span>
+                  </a>
+                </div>
+              )}
             </div>
             {type !== "file" ? (
               folders.map((folder, index) => {
@@ -1405,7 +1460,17 @@ const Home = (props) => {
                       />
                     )}
 
-                    {buildAssLayer(liveCues, assMeta, picRect, { secondary: secLang ? liveCues2 : [], controlsHidden: hide && state.playing, onGrab: () => state.playing && setStateElm({ playing: false }) })}
+                    {buildAssLayer(liveCues, assMeta, picRect, { secondary: secLang ? liveCues2 : [], controlsHidden: hide && state.playing, onGrab: () => state.playing && setStateElm({ playing: false }), saved: savedMatcher, hover: isMouse && !touch, onWord: openTranslate })}
+                    {trWord && (
+                      <TranslatePopup
+                        key={trWord.id}
+                        apiBase={`http://${hostname}:8081`}
+                        text={trWord.text}
+                        anchor={trWord.anchor}
+                        hoverId={trWord.hoverId}
+                        onClose={() => setTrWord(null)}
+                      />
+                    )}
 
                     {!!toast && (
                       <div
@@ -1437,6 +1502,8 @@ const Home = (props) => {
                     </div>
                     <div
                       className="v-overlayVideo"
+                      // Chế độ TV: màng che nằm trên cả lớp sub (z-index 15) và cửa sổ dịch (z-index 2147483000), mọi cú bấm đều là phát / tạm dừng
+                      style={isMouse ? undefined : { zIndex: 2147483647 }}
                       onClick={handleOverlayTap}
                       onDoubleClick={handleOverlayDoubleClick}
                     ></div>
@@ -1829,6 +1896,7 @@ const Home = (props) => {
                 {isMouse && !_.isEmpty(subtitles) && (
                   <div
                     id="cue_panel"
+                    {...hoverSavedHandlers(openTranslate)}
                     onWheel={() => (userScrollRef.current = Date.now())}
                     onMouseDown={() => (userScrollRef.current = Date.now())}
                     onTouchStart={() => (userScrollRef.current = Date.now())}
@@ -1870,7 +1938,7 @@ const Home = (props) => {
                         >
                           <div style={{ flex: 1 }}>
                             <span style={{ color: "#777", fontSize: "12px", marginRight: "8px" }}>{formatClock(cue.start)}</span>
-                            {cue.text}
+                            {highlightSaved(cue.text, savedMatcher, "c" + i)}
                           </div>
                           <button
                             type="button"

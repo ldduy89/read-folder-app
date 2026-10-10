@@ -10,6 +10,7 @@ import {
 // import Home component
 import Home from "./home";
 import Read from "./read";
+import TranslateWords from "./translateWords";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           with exact path "/", in component props 
           we passes the imported component*/}
           <Route exact path="/read/*" component={Read} />
+          <Route exact path="/translate-words" component={TranslateWords} />
           <Route exact path="/*" component={Home} />
 
           
