@@ -13,6 +13,25 @@ import TranslatePopup from "./translatePopup";
 import { isTV, isTouch } from "./device";
 import { Link, useHistory } from "react-router-dom";
 
+// Xoay màn hình theo toàn màn hình (điện thoại / máy tính bảng): vào full -> khoá ngang, thoát -> khoá dọc rồi trả lại tự xoay.
+// Chỉ chạy ở trình duyệt có screen.orientation.lock (Chrome / Firefox Android); iPhone không hỗ trợ nên bỏ qua êm.
+const orient = () => (typeof window !== "undefined" && window.screen && window.screen.orientation) || null;
+const lockOrient = (type) => {
+  const o = orient();
+  if (!o || !o.lock) return Promise.resolve();
+  try {
+    return o.lock(type).catch(() => {});
+  } catch (e) {
+    return Promise.resolve();
+  }
+};
+const unlockOrient = () => {
+  const o = orient();
+  try {
+    if (o && o.unlock) o.unlock();
+  } catch (e) {}
+};
+
 const Home = (props) => {
   const playerRef = useRef(null);
   const currentRef = useRef(null);
@@ -637,7 +656,7 @@ const Home = (props) => {
     if (!player) return;
     const target = Math.max(cue.start, 0) + 0.01;
     player.seekTo(target, "seconds");
-    if (state.duration > 0) setStateElm({ played: target / state.duration });
+    setStateElm({ playing: true, ...(state.duration > 0 ? { played: target / state.duration } : {}) }); // tua xong thì phát luôn nếu đang dừng
   };
 
   // Lặp lại một phụ đề: hết cue thì tua ngay về đầu cue và phát tiếp
@@ -878,8 +897,16 @@ const Home = (props) => {
       // TV: thoát full screen = quay về danh sách. PC: ở lại trang xem video.
       if (!isMouse) history.replace(`/${backRootPath}`, { folder: _.last(fullPathRoot) });
       setIsFullSreen(false);
+      // Thoát full (kể cả bằng cử chỉ quay lại): về màn dọc, rồi trả lại chế độ tự xoay
+      if (touch) lockOrient("portrait").then(() => setTimeout(unlockOrient, 600));
     } else {
       setIsFullSreen(true);
+      // Vào full: xoay ngang ngay (trừ video quay dọc)
+      if (touch) {
+        const v = document.querySelector("#sample_video video");
+        const portraitVideo = v && v.videoWidth && v.videoHeight > v.videoWidth;
+        if (!portraitVideo) lockOrient("landscape");
+      }
     }
   };
 
@@ -894,6 +921,9 @@ const Home = (props) => {
   const handleFullSreen = (isFullSreen) => {
     if (isFullSreen) {
       sample_video.requestFullscreen();
+    } else if (touch) {
+      // Khoá dọc trước khi thoát (trình duyệt chỉ cho khoá khi còn đang full)
+      lockOrient("portrait").then(() => document.exitFullscreen());
     } else {
       document.exitFullscreen();
     }
@@ -908,14 +938,14 @@ const Home = (props) => {
   };
 
   const handleSeekMouseUp = (e) => {
-    setStateElm({ seeking: false, played: state.seekingLine });
+    setStateElm({ seeking: false, played: state.seekingLine, playing: true }); // tua xong thì phát luôn nếu đang dừng
     playerRef.current?.seekTo(parseFloat(state.seekingLine * state.duration), "seconds");
   };
 
   const handleChangeSeek = (isNext, seconds) => {
     let newSeconds = parseFloat(state.played * state.duration) + (isNext ? seconds || 15 : -(seconds || 15));
     newSeconds = newSeconds > 0 ? newSeconds : 0;
-    setStateElm({ played: newSeconds / state.duration });
+    setStateElm({ played: newSeconds / state.duration, playing: true }); // tua xong thì phát luôn nếu đang dừng
     playerRef.current?.seekTo(newSeconds, "seconds");
   };
 
@@ -1027,7 +1057,7 @@ const Home = (props) => {
     const max = state.duration > 0 ? Math.max(state.duration - 1, 0) : Infinity;
     const target = Math.min(Math.max(current + delta, 0), max);
     player.seekTo(target, "seconds");
-    if (state.duration > 0) setStateElm({ played: target / state.duration });
+    setStateElm({ playing: true, ...(state.duration > 0 ? { played: target / state.duration } : {}) }); // tua xong thì phát luôn nếu đang dừng
     handleAutoHide();
   };
 
@@ -1237,6 +1267,8 @@ const Home = (props) => {
   };
 
   const handleOverlayDoubleClick = (e) => {
+    // TV: bấm OK nhanh sẽ thành "double click"; ở TV thoát full screen = quay về danh sách nên tuyệt đối không xử lý double click
+    if (!isMouse) return;
     // Chạm 2 lần ở hai bên = tua 2 lần, không bật/tắt full screen
     if (touch && tapZoneOf(e) !== "center") return;
     handleFullSreen(!isFullSreen);
@@ -1502,10 +1534,12 @@ const Home = (props) => {
                     </div>
                     <div
                       className="v-overlayVideo"
-                      // Chế độ TV: màng che nằm trên cả lớp sub (z-index 15) và cửa sổ dịch (z-index 2147483000), mọi cú bấm đều là phát / tạm dừng
-                      style={isMouse ? undefined : { zIndex: 2147483647 }}
-                      onClick={handleOverlayTap}
-                      onDoubleClick={handleOverlayDoubleClick}
+                      // Chế độ TV: màng che nằm trên cả lớp sub (z-index 15) và cửa sổ dịch (z-index 2147483000), và phủ KÍN cả vùng thanh điều khiển
+                      // (height 100%) để cú bấm thật không lọt xuống nút nào (vd nút full screen khi con trỏ kẹt ở góc dưới bên phải).
+                      // Mọi thao tác của remote đi qua onClick của #sample_video (focus bằng indexFile + .click() trực tiếp lên nút).
+                      style={isMouse ? undefined : { zIndex: 2147483647, height: "100%" }}
+                      onClick={isMouse ? handleOverlayTap : undefined}
+                      onDoubleClick={isMouse ? handleOverlayDoubleClick : (e) => e.stopPropagation()}
                     ></div>
                     {touch && tapHint && (
                       <div
