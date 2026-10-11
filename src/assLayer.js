@@ -100,6 +100,9 @@ const SELECT_DELAY_MS = 0; // 0 = bôi đen và dịch ngay khi bấm
 const MANUAL_SELECT_MS = 350;
 let selectTimer = null;
 let manualTimer = null;
+let lastSelectAt = 0; // lần gần nhất app tự bôi đen 1 từ (bấm vào từ)
+// Vừa tự bôi đen 1 từ (đã dịch rồi): để chỗ nghe selectionchange trên cảm ứng không dịch lặp
+export const recentWordSelect = () => Date.now() - lastSelectAt < 1200;
 
 const anchorOf = (range) => {
   const r = range.getBoundingClientRect();
@@ -121,6 +124,7 @@ const dblClickWord = (e, opts) => {
     if (!range.startContainer.isConnected) return; // sub đã đổi sang câu khác
     cur.removeAllRanges();
     cur.addRange(range);
+    lastSelectAt = Date.now();
     if (opts && opts.onWord) opts.onWord(text, anchorOf(range));
   };
   if (SELECT_DELAY_MS > 0) selectTimer = setTimeout(run, SELECT_DELAY_MS);

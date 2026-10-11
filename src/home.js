@@ -7,7 +7,7 @@ import ReactPlayer from "react-player";
 import _ from "lodash";
 import Duration from "./Duration";
 import { plainCueText } from "./assText";
-import { buildAssLayer, buildSavedMatcher, highlightSaved, hoverSavedHandlers, wordSelectHandlers } from "./assLayer";
+import { buildAssLayer, buildSavedMatcher, highlightSaved, hoverSavedHandlers, wordSelectHandlers, recentWordSelect } from "./assLayer";
 import { getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
 import TranslatePopup from "./translatePopup";
 import { isTV, isTouch } from "./device";
@@ -152,6 +152,48 @@ const Home = (props) => {
   // Chế độ chỉ nghe tiếng: ẩn hình (video vẫn chạy), khung phụ đề chiếm chỗ của video, bấm vào chữ để tô đen / dịch
   const [audioOnly, setAudioOnly] = useState(false);
   const layoutStacked = stacked || audioOnly; // chỉ nghe thì luôn xếp dọc: thanh điều khiển gọn ở trên, danh sách sub phía dưới
+
+  // Điện thoại: nhấn giữ + kéo cột chọn để bôi đen KHÔNG phát mouseup nên không dịch được như trên PC.
+  // Nghe selectionchange: vừa chọn vào chữ sub thì tạm dừng (sub đổi câu sẽ mất vùng chọn), dừng tay 0.7s thì dịch đoạn đang chọn.
+  const trWordRef = useRef(null);
+  trWordRef.current = trWord;
+  const audioOnlyRef = useRef(false);
+  audioOnlyRef.current = audioOnly;
+  useEffect(() => {
+    if (!touch) return;
+    let timer;
+    // Vùng chọn hiện tại nếu nằm trong chữ sub (lớp sub trên video, hoặc khung danh sách khi đang chỉ nghe), ngược lại null
+    const subSelection = () => {
+      const sel = window.getSelection && window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+      const node = sel.anchorNode;
+      const el = node && (node.nodeType === 1 ? node : node.parentElement);
+      const seg = el && el.closest ? el.closest("[data-sub-seg]") : null;
+      if (!seg) return null;
+      if (seg.closest("#cue_panel") && !audioOnlyRef.current) return null; // khung danh sách chỉ dịch ở chế độ chỉ nghe (giống PC)
+      const text = sel.toString().replace(/\s+/g, " ").trim();
+      return text ? { sel, text: text.slice(0, 1000) } : null;
+    };
+    const onSelectionChange = () => {
+      clearTimeout(timer);
+      if (recentWordSelect()) return; // vừa bấm 1 từ: đã tự dịch rồi
+      const first = subSelection();
+      if (!first) return;
+      if (playingRef.current) setStateElmRef.current({ playing: false }); // chọn chữ thì tạm dừng cho kịp bôi đen / đọc nghĩa
+      timer = setTimeout(() => {
+        const cur = subSelection();
+        if (!cur || recentWordSelect()) return;
+        if (trWordRef.current && trWordRef.current.text === cur.text) return; // đoạn này đang được dịch
+        const r = cur.sel.getRangeAt(0).getBoundingClientRect();
+        openTranslate(cur.text, { x: r.left, y: r.bottom, top: r.top });
+      }, 700);
+    };
+    document.addEventListener("selectionchange", onSelectionChange);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("selectionchange", onSelectionChange);
+    };
+  }, [touch]);
   // Độ rộng thật của khung chứa video + phụ đề (đo lại khi xoay màn hình / đổi kích thước)
   const stackRef = useRef(null);
   const [stackW, setStackW] = useState(0);
