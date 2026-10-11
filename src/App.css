@@ -935,3 +935,15 @@ img {
     display: none;
   }
 }
+
+/* ---- Chế độ chỉ nghe tiếng: ẩn hình nhưng video vẫn chạy ---- */
+#sample_video.audio-only {
+  overflow: visible; /* popup chọn sub / tốc độ / audio mở lên trên thanh điều khiển nên không được cắt */
+}
+#sample_video.audio-only .react-player {
+  visibility: hidden; /* vẫn phát tiếng bình thường */
+}
+#sample_video.audio-only .v-overlayVideo,
+#sample_video.audio-only .v-bigPlay {
+  display: none;
+}

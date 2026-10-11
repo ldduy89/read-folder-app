@@ -141,6 +141,17 @@ const manualSelect = (e, opts) => {
   }, MANUAL_SELECT_MS);
 };
 
+// Gắn vào một khung chứa chữ bất kỳ (vd khung danh sách phụ đề): bấm 1 lần vào từ (trong phần có data-sub-seg) -> bôi đen + dịch,
+// tự bôi đen bằng chuột -> dịch đoạn đang chọn. Giống hành vi của lớp sub trên video.
+export const wordSelectHandlers = (opts) => ({
+  onClick: (e) => {
+    if (!(e.target && e.target.closest && e.target.closest("[data-sub-seg]"))) return; // bấm nút / mốc thời gian: bỏ qua
+    e.stopPropagation();
+    dblClickWord(e, opts);
+  },
+  onMouseUp: (e) => manualSelect(e, opts)
+});
+
 // Cue có \pos: neo theo toạ độ của sub, nhưng nếu khối chữ rộng hơn khoảng trống thì đẩy lại cho nằm trọn trong khung hình
 // (tránh bị cắt mất một đầu như "anh Long Tông"), giống cách libass giữ sub trong màn hình.
 const PositionedCue = ({ left, top, tx, ty, picW, picH, zIndex, children }) => {

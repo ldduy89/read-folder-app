@@ -7,7 +7,7 @@ import ReactPlayer from "react-player";
 import _ from "lodash";
 import Duration from "./Duration";
 import { plainCueText } from "./assText";
-import { buildAssLayer, buildSavedMatcher, highlightSaved, hoverSavedHandlers } from "./assLayer";
+import { buildAssLayer, buildSavedMatcher, highlightSaved, hoverSavedHandlers, wordSelectHandlers } from "./assLayer";
 import { getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
 import TranslatePopup from "./translatePopup";
 import { isTV, isTouch } from "./device";
@@ -149,6 +149,9 @@ const Home = (props) => {
     };
   }, []);
   const stacked = isMouse && (view.h > view.w || view.w < 640);
+  // Chế độ chỉ nghe tiếng: ẩn hình (video vẫn chạy), khung phụ đề chiếm chỗ của video, bấm vào chữ để tô đen / dịch
+  const [audioOnly, setAudioOnly] = useState(false);
+  const layoutStacked = stacked || audioOnly; // chỉ nghe thì luôn xếp dọc: thanh điều khiển gọn ở trên, danh sách sub phía dưới
   // Độ rộng thật của khung chứa video + phụ đề (đo lại khi xoay màn hình / đổi kích thước)
   const stackRef = useRef(null);
   const [stackW, setStackW] = useState(0);
@@ -866,23 +869,32 @@ const Home = (props) => {
   // Cảm ứng + khung hẹp: ẩn nút tua 2 phút (đã có chạm hai bên video) và nút âm lượng (điện thoại có phím cứng),
   // chuyển chữ thời gian lên thanh tiêu đề để 8 nút còn lại to và dễ bấm
   const containerW = sample_video ? sample_video.offsetWidth : videoW;
+  const sizeW = audioOnly ? containerW || videoW : videoW; // chỉ nghe: khung video bị thu nhỏ nên lấy độ rộng khung thay vì độ rộng ảnh
   const compactTouch = touch && containerW > 0 && containerW < 700;
   const touchButtons = compactTouch ? 7 : 9; // số nút trên thanh điều khiển
   const touchTimeW = compactTouch ? 0 : 110; // chỗ chừa cho chữ thời gian trên thanh điều khiển
   const barPx = touch && containerW
     ? Math.round(Math.min(Math.max((containerW - 24 - touchTimeW) / (touchButtons + 0.2), 34), 56))
-    : videoW
-    ? Math.round(Math.min(Math.max(videoW / 28, 32), 110))
+    : sizeW
+    ? Math.round(Math.min(Math.max(sizeW / 28, 32), 110))
     : 50;
+  const titlePx = Math.round(Math.min(Math.max((containerW || sizeW || 600) / 40, 14), 40)); // cỡ chữ tiêu đề, co giãn theo độ rộng khung
+  const audioBarH = Math.round(barPx + titlePx * 2 + 34); // chiều cao khung player khi chỉ nghe: thanh tiêu đề + tiến trình + thanh điều khiển
+  const hideUI = hide && !audioOnly; // chỉ nghe thì thanh điều khiển luôn hiện
   const sizeBar = {
     // Nút điều khiển và chữ thời gian co giãn liên tục theo độ rộng khung video
     "--width-bar": barPx + "px",
-    "--font-size": videoW ? Math.round(Math.min(Math.max(videoW / 90, touch ? 13 : 11), 26)) + "px" : "12px",
-    // Chiều cao tối đa của popup chọn (sub / tốc độ / audio): không cao quá khung video
-    "--menu-max-h": videoH ? Math.max(videoH - barPx - 16, 80) + "px" : "70vh",
+    "--font-size": sizeW ? Math.round(Math.min(Math.max(sizeW / 90, touch ? 13 : 11), 26)) + "px" : "12px",
+    // Chiều cao tối đa của popup chọn (sub / tốc độ / audio): không cao quá khung video (chỉ nghe: khung rất thấp nên cho tối đa 230px, popup mở lên trên)
+    "--menu-max-h": audioOnly ? "230px" : videoH ? Math.max(videoH - barPx - 16, 80) + "px" : "70vh",
     "--font-size-subtitle": videoH ? Math.max(videoH / 18, 14) + "px" : "24px",
     // Tiêu đề video co giãn theo độ rộng khung video
-    "--font-size-title": Math.round(Math.min(Math.max((containerW || videoW || 600) / 40, 14), 40)) + "px"
+    "--font-size-title": titlePx + "px"
+  };
+
+  const toggleAudioOnly = () => {
+    if (!audioOnly && isFullSreen) handleFullSreen(false); // đang full screen thì thoát trước khi ẩn hình
+    setAudioOnly(!audioOnly);
   };
 
   useEffect(() => {
@@ -920,6 +932,7 @@ const Home = (props) => {
 
   const handleFullSreen = (isFullSreen) => {
     if (isFullSreen) {
+      if (audioOnly) setAudioOnly(false); // bấm full screen khi đang chỉ nghe: hiện lại video
       sample_video.requestFullscreen();
     } else if (touch) {
       // Khoá dọc trước khi thoát (trình duyệt chỉ cho khoá khi còn đang full)
@@ -1185,6 +1198,12 @@ const Home = (props) => {
             e.preventDefault();
             handleFullSreen(!isFullSreen);
             break;
+          case "v":
+          case "V":
+            // Chỉ nghe tiếng (ẩn / hiện video)
+            e.preventDefault();
+            if (isMouse && !e.repeat) toggleAudioOnly();
+            break;
           case "Escape":
           case "Backspace":
             // Đang full screen thì Esc do trình duyệt xử lý (thoát full screen); lần sau mới quay về danh sách
@@ -1244,6 +1263,23 @@ const Home = (props) => {
     return x < TAP_ZONE ? "left" : x > 1 - TAP_ZONE ? "right" : "center";
   };
 
+  const DOUBLE_TAP_MS = 280; // hai lần chạm cách nhau không quá thời gian này mới tính là chạm đôi
+  const tapPendingRef = useRef(null); // lần chạm đơn ở hai bên đang chờ xem có phải chạm đôi không
+  const playingRef = useRef(true);
+  playingRef.current = state.playing;
+
+  const doTapSeek = (zone) => {
+    const now = Date.now();
+    const acc = tapAccumRef.current;
+    // chạm liên tiếp cùng một bên thì cộng dồn số giây hiển thị
+    const total = acc.side === zone && now - acc.time < 900 ? acc.total + TAP_SEEK : TAP_SEEK;
+    tapAccumRef.current = { side: zone, total, time: now };
+    seekBy(zone === "left" ? -TAP_SEEK : TAP_SEEK);
+    setTapHint({ side: zone, total });
+    clearTimeout(tapHintTimerRef.current);
+    tapHintTimerRef.current = setTimeout(() => setTapHint(null), 800);
+  };
+
   const handleOverlayTap = (e) => {
     // Bấm ra ngoài chữ sub (phát / tạm dừng): bỏ tô đen từ đang chọn
     const sel = window.getSelection && window.getSelection();
@@ -1252,14 +1288,26 @@ const Home = (props) => {
       const zone = tapZoneOf(e);
       if (zone !== "center") {
         const now = Date.now();
+        const pend = tapPendingRef.current;
         const acc = tapAccumRef.current;
-        // chạm liên tiếp cùng một bên thì cộng dồn số giây hiển thị
-        const total = acc.side === zone && now - acc.time < 900 ? acc.total + TAP_SEEK : TAP_SEEK;
-        tapAccumRef.current = { side: zone, total, time: now };
-        seekBy(zone === "left" ? -TAP_SEEK : TAP_SEEK);
-        setTapHint({ side: zone, total });
-        clearTimeout(tapHintTimerRef.current);
-        tapHintTimerRef.current = setTimeout(() => setTapHint(null), 800);
+        const chaining = acc.side === zone && now - acc.time < 900; // đang tua liên tục: mỗi cú chạm tiếp theo tua tiếp
+        const isDouble = pend && pend.zone === zone && now - pend.time < DOUBLE_TAP_MS;
+        if (chaining || isDouble) {
+          if (pend) clearTimeout(pend.timer);
+          tapPendingRef.current = null;
+          doTapSeek(zone); // chạm đôi -> tua
+          return;
+        }
+        // Chạm 1 lần: chờ xem có chạm lần 2 không; nếu không thì phát / dừng video
+        if (pend) {
+          clearTimeout(pend.timer);
+          if (pend.zone !== zone) setStateElmRef.current({ playing: !playingRef.current }); // chạm đơn bên kia vẫn tính là phát / dừng
+        }
+        const timer = setTimeout(() => {
+          tapPendingRef.current = null;
+          setStateElmRef.current({ playing: !playingRef.current });
+        }, DOUBLE_TAP_MS);
+        tapPendingRef.current = { zone, time: now, timer };
         return;
       }
     }
@@ -1402,7 +1450,7 @@ const Home = (props) => {
                 ref={stackRef}
                 style={
                   isMouse
-                    ? stacked
+                    ? layoutStacked
                       ? { display: "flex", flexDirection: "column", gap: "12px", width: "100%" }
                       : { display: "flex", gap: "12px", alignItems: "flex-start" }
                     : undefined
@@ -1412,7 +1460,9 @@ const Home = (props) => {
                   className="player-wrapper"
                   style={
                     isMouse
-                      ? stacked
+                      ? audioOnly
+                        ? { width: "100%", height: audioBarH + "px" } // chỉ nghe: chỉ còn thanh tiêu đề + thanh điều khiển
+                        : stacked
                         ? { width: "100%", height: Math.round((bodyW * 9) / 16) + "px" } // video 16:9 chiếm hết bề ngang
                         : { height: "80vh", flex: 1, minWidth: 0 }
                       : undefined
@@ -1449,7 +1499,7 @@ const Home = (props) => {
                       }
                     }}
                     id="sample_video"
-                    className={`v-vlite ${state.playing ? "v-playing" : "v-paused"} ${hide ? "nocursor" : ""} ${isMouse ? "" : "v-remote"}`}
+                    className={`v-vlite ${state.playing ? "v-playing" : "v-paused"} ${hideUI ? "nocursor" : ""} ${isMouse ? "" : "v-remote"} ${audioOnly ? "audio-only" : ""}`}
                     style={sizeBar}
                   >
                     {!isMouse && <div className="mang"></div>}
@@ -1492,8 +1542,8 @@ const Home = (props) => {
                       />
                     )}
 
-                    {buildAssLayer(liveCues, assMeta, picRect, { secondary: secLang ? liveCues2 : [], controlsHidden: hide && state.playing, onGrab: () => state.playing && setStateElm({ playing: false }), saved: savedMatcher, hover: isMouse && !touch, onWord: openTranslate })}
-                    {trWord && (
+                    {!audioOnly && buildAssLayer(liveCues, assMeta, picRect, { secondary: secLang ? liveCues2 : [], controlsHidden: hide && state.playing, onGrab: () => state.playing && setStateElm({ playing: false }), saved: savedMatcher, hover: isMouse && !touch, onWord: openTranslate })}
+                    {trWord && !audioOnly && (
                       <TranslatePopup
                         key={trWord.id}
                         apiBase={`http://${hostname}:8081`}
@@ -1522,7 +1572,7 @@ const Home = (props) => {
                         {toast}
                       </div>
                     )}
-                    <div className={`v-topBar ${hide ? "hidden" : ""}`}>
+                    <div className={`v-topBar ${hideUI ? "hidden" : ""}`}>
                       <span className="v-topTitle">{fileName}</span>
                       {compactTouch && (
                         <span className="v-topTime">
@@ -1530,6 +1580,40 @@ const Home = (props) => {
                           &nbsp;/&nbsp;
                           <Duration seconds={state.duration}></Duration>
                         </span>
+                      )}
+                      {isMouse && (
+                        <button
+                          type="button"
+                          title={audioOnly ? "Hiện video (V)" : "Chỉ nghe tiếng, ẩn video (V)"}
+                          aria-pressed={audioOnly}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAudioOnly();
+                          }}
+                          style={{
+                            flexShrink: 0,
+                            position: "relative",
+                            zIndex: 31, // nằm trên lớp bắt bấm của video
+                            width: Math.round(titlePx * 1.9) + "px",
+                            height: Math.round(titlePx * 1.9) + "px",
+                            padding: 0,
+                            borderRadius: "50%",
+                            border: "1px solid " + (audioOnly ? "#ffd700" : "rgba(255,255,255,0.5)"),
+                            background: audioOnly ? "rgba(255,215,0,0.25)" : "rgba(255,255,255,0.15)",
+                            cursor: "pointer",
+                            pointerEvents: hideUI ? "none" : "auto"
+                          }}
+                        >
+                          <svg width="70%" height="70%" viewBox="0 0 36 36" fill="#fff" aria-hidden="true">
+                            {audioOnly ? (
+                              // đang chỉ nghe: biểu tượng máy quay = bấm để hiện lại video
+                              <path d="M8 11h14a2 2 0 0 1 2 2v3.5l5-3.5v10l-5-3.5V23a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V13a2 2 0 0 1 2-2z" />
+                            ) : (
+                              // tai nghe = bấm để chỉ nghe tiếng
+                              <path d="M18 8C12.5 8 8 12.5 8 18v6c0 1.1.9 2 2 2h2v-7h-2c0-4.4 3.6-8 8-8s8 3.6 8 8h-2v7h2c1.1 0 2-.9 2-2v-6c0-5.5-4.5-10-10-10z" />
+                            )}
+                          </svg>
+                        </button>
                       )}
                     </div>
                     <div
@@ -1566,7 +1650,7 @@ const Home = (props) => {
                         <path d="M10 0C4.48 0 0 4.48 0 10s4.48 10 10 10 10-4.48 10-10S15.52 0 10 0ZM7.5 12.67V7.33c0-.79.88-1.27 1.54-.84l4.15 2.67a1 1 0 0 1 0 1.68l-4.15 2.67c-.66.43-1.54-.05-1.54-.84Z"></path>
                       </svg>
                     </button>
-                    <div className={`v-controlBar ${hide ? "hidden" : ""}`}>
+                    <div className={`v-controlBar ${hideUI ? "hidden" : ""}`}>
                       <div className="v-progressBar" id="play_0">
                         <div className="v-progressSeek" style={{ width: `${(state.seeking ? state.seekingLine : state.played) * 100}%` }}></div>
                         <input
@@ -1931,20 +2015,27 @@ const Home = (props) => {
                   <div
                     id="cue_panel"
                     {...hoverSavedHandlers(openTranslate)}
+                    {...(audioOnly ? wordSelectHandlers({ onWord: openTranslate }) : {})}
                     onWheel={() => (userScrollRef.current = Date.now())}
-                    onMouseDown={() => (userScrollRef.current = Date.now())}
+                    onMouseDown={(e) => {
+                      userScrollRef.current = Date.now();
+                      // Chỉ nghe: bấm vào chữ thì tạm dừng để bôi đen / đọc nghĩa kịp (giống chữ sub trên video)
+                      if (audioOnly && state.playing && e.target && e.target.closest && e.target.closest("[data-sub-seg]")) setStateElm({ playing: false });
+                    }}
                     onTouchStart={() => (userScrollRef.current = Date.now())}
                     style={{
-                      width: stacked ? "100%" : "min(360px, 40vw)",
+                      width: layoutStacked ? "100%" : "min(360px, 40vw)",
                       flexShrink: 0,
-                      height: stacked ? "50vh" : "80vh",
+                      height: audioOnly ? "max(240px, calc(100vh - 290px))" : stacked ? "50vh" : "80vh", // chỉ nghe: khung sub chiếm gần hết phần còn lại của màn hình
+                      maxWidth: audioOnly ? "900px" : undefined,
+                      alignSelf: audioOnly ? "center" : undefined,
                       overflowY: "auto",
                       position: "relative",
                       background: "#141414",
                       color: "#ddd",
                       textAlign: "left",
                       cursor: "default",
-                      fontSize: "15px",
+                      fontSize: audioOnly ? "17px" : "15px",
                       lineHeight: 1.4,
                       borderRadius: "6px"
                     }}
@@ -1958,10 +2049,10 @@ const Home = (props) => {
                         <div
                           id={`cue_${i}`}
                           key={i}
-                          onClick={() => seekToCue(cue)}
+                          onClick={audioOnly ? undefined : () => seekToCue(cue)} // chỉ nghe: bấm vào chữ để tô đen / dịch, đi tới câu bằng nút riêng
                           style={{
                             padding: "6px 10px",
-                            cursor: "pointer",
+                            cursor: audioOnly ? "default" : "pointer",
                             display: "flex",
                             alignItems: "flex-start",
                             gap: "8px",
@@ -1972,8 +2063,34 @@ const Home = (props) => {
                         >
                           <div style={{ flex: 1 }}>
                             <span style={{ color: "#777", fontSize: "12px", marginRight: "8px" }}>{formatClock(cue.start)}</span>
-                            {highlightSaved(cue.text, savedMatcher, "c" + i)}
+                            <span data-sub-seg="1" style={audioOnly ? { cursor: "text", userSelect: "text", WebkitUserSelect: "text" } : undefined}>
+                              {highlightSaved(cue.text, savedMatcher, "c" + i)}
+                            </span>
                           </div>
+                          {audioOnly && (
+                            <button
+                              type="button"
+                              title="Phát video từ câu này"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                seekToCue(cue);
+                              }}
+                              style={{
+                                flexShrink: 0,
+                                width: touch ? "36px" : "28px",
+                                height: touch ? "36px" : "28px",
+                                borderRadius: "50%",
+                                border: "1px solid #5aa564",
+                                background: "transparent",
+                                color: "#7fcf8a",
+                                fontSize: "13px",
+                                padding: 0,
+                                cursor: "pointer"
+                              }}
+                            >
+                              ▶
+                            </button>
+                          )}
                           <button
                             type="button"
                             title="Lặp lại câu này"
@@ -1984,14 +2101,14 @@ const Home = (props) => {
                             }}
                             style={{
                               flexShrink: 0,
-                              width: "28px",
-                              height: "28px",
+                              width: touch ? "36px" : "28px",
+                              height: touch ? "36px" : "28px",
                               borderRadius: "50%",
                               border: "1px solid " + (i === loopIndex ? "#ffd700" : "#444"),
                               background: i === loopIndex ? "#ffd700" : "transparent",
                               color: i === loopIndex ? "#000" : "#888",
                               fontSize: "14px",
-                              lineHeight: "26px",
+                              lineHeight: touch ? "34px" : "26px",
                               padding: 0,
                               cursor: "pointer"
                             }}
@@ -2002,6 +2119,16 @@ const Home = (props) => {
                       ))
                     )}
                   </div>
+                )}
+                {audioOnly && trWord && (
+                  <TranslatePopup
+                    key={trWord.id}
+                    apiBase={`http://${hostname}:8081`}
+                    text={trWord.text}
+                    anchor={trWord.anchor}
+                    hoverId={trWord.hoverId}
+                    onClose={() => setTrWord(null)}
+                  />
                 )}
               </div>
             )}
