@@ -148,7 +148,24 @@ const Home = (props) => {
       window.removeEventListener("orientationchange", onResize);
     };
   }, []);
-  const stacked = isMouse && (view.h > view.w || view.w < 640);
+  // Cảm ứng + đang full screen: khung sub nằm bên cạnh video (xếp ngang), có nút đóng / mở
+  const fsSide = touch && isFullSreen;
+  const [sideOpen, setSideOpen] = useState(() => {
+    try {
+      return localStorage.getItem("fsSideOpen") === "1";
+    } catch (e) {
+      return false;
+    }
+  });
+  const toggleSide = () => {
+    setSideOpen((v) => {
+      try {
+        localStorage.setItem("fsSideOpen", v ? "0" : "1");
+      } catch (e) {}
+      return !v;
+    });
+  };
+  const stacked = isMouse && !fsSide && (view.h > view.w || view.w < 640);
   // Chế độ chỉ nghe tiếng: ẩn hình (video vẫn chạy), khung phụ đề chiếm chỗ của video, bấm vào chữ để tô đen / dịch
   const [audioOnly, setAudioOnly] = useState(false);
   const layoutStacked = stacked || audioOnly; // chỉ nghe thì luôn xếp dọc: thanh điều khiển gọn ở trên, danh sách sub phía dưới
@@ -696,6 +713,17 @@ const Home = (props) => {
     return () => clearInterval(id);
   }, [cueList]);
 
+  // Mở khung sub bên cạnh: cuộn tới câu đang phát
+  useEffect(() => {
+    if (!fsSide || !sideOpen) return;
+    const t = setTimeout(() => {
+      const panel = document.getElementById("cue_panel");
+      const item = document.getElementById(`cue_${lastCueRef.current}`);
+      if (panel && item) panel.scrollTop = item.offsetTop - panel.clientHeight / 2 + item.offsetHeight / 2;
+    }, 60);
+    return () => clearTimeout(t);
+  }, [fsSide, sideOpen]);
+
   const seekToCue = (cue) => {
     const player = playerRef.current;
     if (!player) return;
@@ -921,7 +949,6 @@ const Home = (props) => {
     ? Math.round(Math.min(Math.max(sizeW / 28, 32), 110))
     : 50;
   const titlePx = Math.round(Math.min(Math.max((containerW || sizeW || 600) / 40, 14), 40)); // cỡ chữ tiêu đề, co giãn theo độ rộng khung
-  const audioBarH = Math.round(barPx + titlePx * 2 + 34); // chiều cao khung player khi chỉ nghe: thanh tiêu đề + tiến trình + thanh điều khiển
   const hideUI = hide && !audioOnly; // chỉ nghe thì thanh điều khiển luôn hiện
   const sizeBar = {
     // Nút điều khiển và chữ thời gian co giãn liên tục theo độ rộng khung video
@@ -975,7 +1002,9 @@ const Home = (props) => {
   const handleFullSreen = (isFullSreen) => {
     if (isFullSreen) {
       if (audioOnly) setAudioOnly(false); // bấm full screen khi đang chỉ nghe: hiện lại video
-      sample_video.requestFullscreen();
+      // Cảm ứng: full screen cả khối (video + khung sub) để mở được khung sub bên cạnh
+      const fsTarget = touch && stackRef.current ? stackRef.current : sample_video;
+      fsTarget.requestFullscreen();
     } else if (touch) {
       // Khoá dọc trước khi thoát (trình duyệt chỉ cho khoá khi còn đang full)
       lockOrient("portrait").then(() => document.exitFullscreen());
@@ -1451,6 +1480,27 @@ const Home = (props) => {
               </div>
               {isMouse && (
                 <div className="App-tools">
+                  {type === "file" && (
+                    <button
+                      type="button"
+                      className={`App-tool App-toolBtn ${audioOnly ? "on" : ""}`}
+                      onClick={toggleAudioOnly}
+                      aria-pressed={audioOnly}
+                      title={audioOnly ? "Hiện video (V)" : "Chỉ nghe tiếng, ẩn video (V)"}
+                      aria-label={audioOnly ? "Hiện video" : "Chỉ nghe"}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 36 36" fill="currentColor" aria-hidden="true">
+                        {audioOnly ? (
+                          // đang chỉ nghe: máy quay = bấm để hiện lại video
+                          <path d="M8 11h14a2 2 0 0 1 2 2v3.5l5-3.5v10l-5-3.5V23a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V13a2 2 0 0 1 2-2z" />
+                        ) : (
+                          // tai nghe = bấm để chỉ nghe tiếng
+                          <path d="M18 8C12.5 8 8 12.5 8 18v6c0 1.1.9 2 2 2h2v-7h-2c0-4.4 3.6-8 8-8s8 3.6 8 8h-2v7h2c1.1 0 2-.9 2-2v-6c0-5.5-4.5-10-10-10z" />
+                        )}
+                      </svg>
+                      <span className="App-toolLabel">{audioOnly ? "Hiện video" : "Chỉ nghe"}</span>
+                    </button>
+                  )}
                   <a className="App-tool" href="/translate-words" target="_blank" rel="noopener noreferrer" title="Danh sách từ đã lưu" aria-label="Từ đã lưu">
                     <span aria-hidden="true">★</span>
                     <span className="App-toolLabel">Từ đã lưu</span>
@@ -1492,7 +1542,9 @@ const Home = (props) => {
                 ref={stackRef}
                 style={
                   isMouse
-                    ? layoutStacked
+                    ? fsSide
+                      ? { display: "flex", flexDirection: "row", gap: 0, alignItems: "stretch", width: "100vw", height: "100vh", background: "#000" }
+                      : layoutStacked
                       ? { display: "flex", flexDirection: "column", gap: "12px", width: "100%" }
                       : { display: "flex", gap: "12px", alignItems: "flex-start" }
                     : undefined
@@ -1502,8 +1554,10 @@ const Home = (props) => {
                   className="player-wrapper"
                   style={
                     isMouse
-                      ? audioOnly
-                        ? { width: "100%", height: audioBarH + "px" } // chỉ nghe: chỉ còn thanh tiêu đề + thanh điều khiển
+                      ? fsSide
+                        ? { height: "100%", flex: 1, minWidth: 0 }
+                        : audioOnly
+                        ? { width: "100%", height: 0, overflow: "hidden", marginBottom: "-12px" } // chỉ nghe: ẩn hẳn cả khung video lẫn thanh điều khiển (video vẫn chạy); -12px bù khoảng cách giữa hai khối xếp dọc
                         : stacked
                         ? { width: "100%", height: Math.round((bodyW * 9) / 16) + "px" } // video 16:9 chiếm hết bề ngang
                         : { height: "80vh", flex: 1, minWidth: 0 }
@@ -1585,6 +1639,41 @@ const Home = (props) => {
                     )}
 
                     {!audioOnly && buildAssLayer(liveCues, assMeta, picRect, { secondary: secLang ? liveCues2 : [], controlsHidden: hide && state.playing, onGrab: () => state.playing && setStateElm({ playing: false }), saved: savedMatcher, hover: isMouse && !touch, onWord: openTranslate })}
+                    {fsSide && !_.isEmpty(subtitles) && (
+                      <button
+                        type="button"
+                        aria-label={sideOpen ? "Đóng khung phụ đề" : "Mở khung phụ đề"}
+                        title={sideOpen ? "Đóng khung phụ đề" : "Mở khung phụ đề"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSide();
+                        }}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          zIndex: 15,
+                          width: "40px",
+                          height: "72px",
+                          border: 0,
+                          borderRadius: "10px 0 0 10px",
+                          background: "rgba(0,0,0,0.55)",
+                          color: "#fff",
+                          fontSize: "20px",
+                          padding: 0,
+                          opacity: hideUI ? 0 : 1,
+                          pointerEvents: hideUI ? "none" : "auto",
+                          transition: "opacity .25s"
+                        }}
+                      >
+                        {sideOpen ? "▶" : "◀"}
+                      </button>
+                    )}
                     {trWord && !audioOnly && (
                       <TranslatePopup
                         key={trWord.id}
@@ -2053,7 +2142,7 @@ const Home = (props) => {
                     </div>
                   </div>
                 </div>
-                {isMouse && !_.isEmpty(subtitles) && (
+                {isMouse && !_.isEmpty(subtitles) && (!fsSide || sideOpen) && (
                   <div
                     id="cue_panel"
                     {...hoverSavedHandlers(openTranslate)}
@@ -2066,9 +2155,9 @@ const Home = (props) => {
                     }}
                     onTouchStart={() => (userScrollRef.current = Date.now())}
                     style={{
-                      width: layoutStacked ? "100%" : "min(360px, 40vw)",
+                      width: fsSide ? "min(320px, 42vw)" : layoutStacked ? "100%" : "min(360px, 40vw)",
                       flexShrink: 0,
-                      height: audioOnly ? "max(240px, calc(100vh - 290px))" : stacked ? "50vh" : "80vh", // chỉ nghe: khung sub chiếm gần hết phần còn lại của màn hình
+                      height: fsSide ? "100%" : audioOnly ? "max(240px, calc(100vh - 130px))" : stacked ? "50vh" : "80vh", // chỉ nghe: khung sub chiếm gần hết phần còn lại của màn hình
                       maxWidth: audioOnly ? "900px" : undefined,
                       alignSelf: audioOnly ? "center" : undefined,
                       overflowY: "auto",
@@ -2079,7 +2168,7 @@ const Home = (props) => {
                       cursor: "default",
                       fontSize: audioOnly ? "17px" : "15px",
                       lineHeight: 1.4,
-                      borderRadius: "6px"
+                      borderRadius: fsSide ? 0 : "6px"
                     }}
                   >
                     {!activeSubLang ? (

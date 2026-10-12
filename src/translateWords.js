@@ -8,14 +8,26 @@ const CSS = `
 .tw *{box-sizing:border-box}
 .tw .wrap{max-width:1100px;margin:0 auto}
 .tw .sticky{position:sticky;top:0;z-index:2;background:var(--bg)}
-.tw .top{padding:12px 16px 8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tw .top{padding:10px 16px 6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tw .menu{width:44px;text-align:center}
 .tw h1{font-size:16px;margin:0 8px 0 0}
 .tw input[type=search],.tw input[type=text],.tw input[type=password]{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit}
-.tw .q{flex:1 1 200px;min-width:140px}
+.tw .q{flex:1 1 120px;min-width:0}
 .tw select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:inherit;font:inherit}
 .tw .btn{border:1px solid var(--line);background:none;color:var(--accent);cursor:pointer;padding:6px 10px;border-radius:8px;font:inherit}
 .tw .btn:hover{background:var(--hover)}
 .tw .btn:disabled{opacity:.5;cursor:default}
+.tw .kinds{padding:0 16px;display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.tw .kind{border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);cursor:pointer;padding:6px 12px;font:inherit;font-weight:600}
+.tw .kind:hover{color:var(--fg)}
+.tw .kind.on{color:var(--accent);border-bottom-color:var(--accent)}
+.tw .kind small{font-weight:400;margin-left:4px;opacity:.8}
+.tw .letters{padding:0 16px 8px;display:flex;flex-wrap:wrap;gap:6px}
+@media (max-width:760px){.tw .letters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.tw .letters::-webkit-scrollbar{display:none}.tw .letter{flex:none;padding:2px 9px}}
+.tw .letter{border:1px solid var(--line);background:none;color:var(--fg);cursor:pointer;padding:3px 10px;border-radius:999px;font:inherit;font-size:12px;display:inline-flex;gap:5px;align-items:center}
+.tw .letter:hover{background:var(--hover)}
+.tw .letter.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.tw .letter small{font-size:10px;opacity:.7}
 .tw .syncstate{font-size:12px;color:var(--muted)}
 .tw .syncstate.err,.tw .err{color:#d93025}
 .tw .ok{color:#188038}
@@ -46,7 +58,9 @@ const CSS = `
 .tw .settings .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .tw .settings input[type=text],.tw .settings input[type=password]{width:100%;max-width:560px}
 .tw .settings h2{font-size:14px;margin:8px 0 0}
-@media (max-width:760px){.tw .cols,.tw .item{grid-template-columns:minmax(90px,1fr) minmax(110px,1.3fr) 54px}.tw .cols>:nth-child(3),.tw .cols>:nth-child(4),.tw .item>:nth-child(3),.tw .item>:nth-child(4){display:none}}
+@media (max-width:760px){.tw .cols,.tw .item{grid-template-columns:minmax(90px,1fr) minmax(110px,1.3fr) 54px}.tw .cols>:nth-child(3),.tw .cols>:nth-child(4),.tw .item>:nth-child(3),.tw .item>:nth-child(4){display:none}
+.tw .item>.acts{grid-column:3;grid-row:1}
+.tw .item.open>.detail:not(:empty){display:block;grid-column:1/-1;grid-row:2;padding:6px 0 4px 22px;border-top:1px dashed var(--line);color:var(--fg)}}
 `;
 
 const fmtDate = (t) => (t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "");
@@ -161,6 +175,22 @@ const readCsvFile = async (file) => {
   }
 };
 
+// Chữ cái đầu của từ (bỏ dấu, viết hoa); ký tự không phải chữ/số gom vào "#"
+const firstLetter = (w) => {
+  const c = norm(w.src).replace(/^[^a-z0-9]+/, "").charAt(0);
+  return c ? c.toUpperCase() : "#";
+};
+
+// Phân loại: "từ" = 1 từ; "câu" = kết thúc bằng . ! ? … hoặc dài từ SENTENCE_MIN_WORDS từ trở lên; còn lại là "cụm từ"
+const SENTENCE_MIN_WORDS = 6;
+const kindOf = (w) => {
+  const t = String(w.src || "").trim();
+  const n = t.split(/\s+/).filter(Boolean).length;
+  if (n <= 1) return "word";
+  if (n >= SENTENCE_MIN_WORDS || /[.!?…]["')\]]*$/.test(t)) return "sentence";
+  return "phrase";
+};
+
 const Words = () => {
   const apiBase = useMemo(apiBaseOf, []);
   const speaker = useMemo(() => createSpeaker(apiBase), [apiBase]);
@@ -171,6 +201,8 @@ const Words = () => {
   const [words, setList] = useState(getWords);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("new");
+  const [kind, setKind] = useState("word"); // "word" | "phrase" | "sentence"
+  const [letter, setLetter] = useState(""); // "" = tất cả
   const [open, setOpen] = useState({});
   const [toast, setToast] = useState(null); // { text, undo }
   const [sync, setSync] = useState({ busy: false, text: "", err: false });
@@ -194,14 +226,36 @@ const Words = () => {
     }, 5000);
   };
 
+  // Các chữ cái đầu đang có trong danh sách + số từ của mỗi chữ
+  const kindCount = useMemo(() => {
+    const c = { word: 0, phrase: 0, sentence: 0 };
+    for (const w of words) c[kindOf(w)]++;
+    return c;
+  }, [words]);
+  const inKind = useMemo(() => words.filter((w) => kindOf(w) === kind), [words, kind]);
+
+  const letters = useMemo(() => {
+    const m = new Map();
+    for (const w of inKind) {
+      const l = firstLetter(w);
+      m.set(l, (m.get(l) || 0) + 1);
+    }
+    return [...m.entries()].sort(([a], [b]) => (a === "#") - (b === "#") || a.localeCompare(b));
+  }, [inKind]);
+
+  // Chữ đang chọn không còn từ nào (vd vừa xóa hết) thì quay về "Tất cả"
+  useEffect(() => {
+    if (letter && !letters.some(([l]) => l === letter)) setLetter("");
+  }, [letters, letter]);
+
   const shown = useMemo(() => {
     const k = q.trim().toLowerCase();
-    const a = words.filter((w) => !k || `${w.src} ${w.meaning} ${w.detail || ""}`.toLowerCase().includes(k));
+    const a = inKind.filter((w) => (!letter || firstLetter(w) === letter) && (!k || `${w.src} ${w.meaning} ${w.detail || ""}`.toLowerCase().includes(k)));
     if (sort === "old") a.sort((x, y) => (x.savedAt || 0) - (y.savedAt || 0));
     else if (sort === "az") a.sort((x, y) => x.src.localeCompare(y.src, undefined, { sensitivity: "base" }));
     else a.sort((x, y) => (y.savedAt || 0) - (x.savedAt || 0));
     return a;
-  }, [words, q, sort]);
+  }, [inKind, q, sort, letter]);
 
   const remove = (w) => {
     lastDeleted.current = w;
@@ -271,20 +325,32 @@ const Words = () => {
       <div className="wrap">
         <div className="sticky">
           <div className="top">
-            <h1>Từ đã lưu ({words.length})</h1>
             <input className="q" type="search" placeholder="Tìm từ, nghĩa…" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
             <select title="Sắp xếp" value={sort} onChange={(e) => setSort(e.target.value)}>
               <option value="new">Mới nhất</option>
               <option value="old">Cũ nhất</option>
               <option value="az">A → Z</option>
             </select>
-            <button className="btn" disabled={sync.busy} title="Gộp danh sách với Google Sheet" onClick={doSync}>
-              Đồng bộ
-            </button>
-            <span className={"syncstate" + (sync.err ? " err" : "")}>{sync.text}</span>
-            <button className="btn" title="Nhập từ file CSV" onClick={() => fileRef.current && fileRef.current.click()}>
-              Nhập CSV
-            </button>
+            <select
+              className="menu"
+              title="Thêm"
+              value=""
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "sync") doSync();
+                else if (v === "import") fileRef.current && fileRef.current.click();
+                else if (v === "export") exportCsv();
+                else if (v === "settings") setShowSet((x) => !x);
+              }}
+            >
+              <option value="">⋯</option>
+              <option value="sync" disabled={sync.busy}>
+                Đồng bộ
+              </option>
+              <option value="import">Nhập CSV</option>
+              <option value="export">Xuất CSV</option>
+              <option value="settings">{showSet ? "Đóng cài đặt" : "Cài đặt"}</option>
+            </select>
             <input
               ref={fileRef}
               type="file"
@@ -296,14 +362,32 @@ const Words = () => {
                 if (f) await importFile(f);
               }}
             />
-            <button className="btn" onClick={exportCsv}>
-              Xuất CSV
-            </button>
-            <button className="btn" onClick={() => setShowSet((v) => !v)}>
-              Cài đặt
-            </button>
+            {sync.text && <span className={"syncstate" + (sync.err ? " err" : "")}>{sync.text}</span>}
           </div>
           {showSet && <Settings apiBase={apiBase} host={rootRef} />}
+          <div className="kinds">
+            <button type="button" className={"kind" + (kind === "word" ? " on" : "")} onClick={() => setKind("word")}>
+              Từ <small>{kindCount.word}</small>
+            </button>
+            <button type="button" className={"kind" + (kind === "phrase" ? " on" : "")} onClick={() => setKind("phrase")}>
+              Cụm từ <small>{kindCount.phrase}</small>
+            </button>
+            <button type="button" className={"kind" + (kind === "sentence" ? " on" : "")} onClick={() => setKind("sentence")}>
+              Câu <small>{kindCount.sentence}</small>
+            </button>
+          </div>
+          {letters.length > 1 && (
+            <div className="letters">
+              <button type="button" className={"letter" + (letter === "" ? " on" : "")} onClick={() => setLetter("")}>
+                Tất cả <small>{inKind.length}</small>
+              </button>
+              {letters.map(([l, n]) => (
+                <button key={l} type="button" className={"letter" + (letter === l ? " on" : "")} onClick={() => setLetter(letter === l ? "" : l)}>
+                  {l} <small>{n}</small>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="cols">
             <span>Từ</span>
             <span>Nghĩa</span>
@@ -313,7 +397,7 @@ const Words = () => {
           </div>
         </div>
         <div>
-          {!shown.length && <div className="empty">{words.length ? "Không có kết quả." : "Chưa có từ nào. Dịch một từ rồi bấm ☆ Lưu trên cửa sổ dịch."}</div>}
+          {!shown.length && <div className="empty">{inKind.length ? "Không có kết quả." : words.length ? (kind === "sentence" ? "Chưa có câu nào." : kind === "phrase" ? "Chưa có cụm từ nào." : "Chưa có từ nào.") : "Chưa có từ nào. Dịch một từ rồi bấm ☆ Lưu trên cửa sổ dịch."}</div>}
           {shown.map((w) => {
             const lang = /^[a-z]{2,3}(-[A-Za-z]+)?$/.test(w.from || "") ? w.from : "en";
             return (

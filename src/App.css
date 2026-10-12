@@ -938,7 +938,10 @@ img {
 
 /* ---- Chế độ chỉ nghe tiếng: ẩn hình nhưng video vẫn chạy ---- */
 #sample_video.audio-only {
-  overflow: visible; /* popup chọn sub / tốc độ / audio mở lên trên thanh điều khiển nên không được cắt */
+  /* Ẩn hẳn khung video và thanh điều khiển; video vẫn chạy để nghe tiếng.
+     Điều khiển bằng phím (Space, ←/→, N/P, V) và nút ▶ / lặp ở từng dòng phụ đề. */
+  visibility: hidden;
+  pointer-events: none;
 }
 #sample_video.audio-only .react-player {
   visibility: hidden; /* vẫn phát tiếng bình thường */
@@ -946,4 +949,16 @@ img {
 #sample_video.audio-only .v-overlayVideo,
 #sample_video.audio-only .v-bigPlay {
   display: none;
+}
+
+/* Nút chuyển chế độ nghe / xem ở hàng công cụ đầu trang */
+.App-toolBtn {
+  background: transparent;
+  font-family: inherit;
+  color: #fff;
+  cursor: pointer;
+}
+.App-toolBtn.on {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.2);
 }
