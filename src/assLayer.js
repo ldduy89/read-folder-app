@@ -338,15 +338,22 @@ const renderLines = (parsed, sy, resY, col, wrap, saved, uid) => {
     });
   });
   const hits = findHits(parts.join(""), saved);
-  return parsed.lines.map((line, li) => (
-    <div key={li} style={{ fontSize: 0, lineHeight: 0, textAlign: H_ALIGN[col] }}>
-      {line.map((seg, si) => (
-        <span key={si} data-sub-seg="1" style={segStyle(seg, sy, resY, wrap)}>
-          {renderPieces(seg.text, starts[li][si], hits, uid)}
-        </span>
-      ))}
-    </div>
-  ));
+  // Bỏ các dòng/đoạn chỉ có khoảng trắng (&nbsp;): nếu không sẽ vẽ ra ô nền đen trống trên video
+  const isBlankText = (t) => !t || !t.replace(/\u00a0/g, " ").trim();
+  return parsed.lines.map((line, li) => {
+    if (line.every((seg) => isBlankText(seg.text))) return null;
+    return (
+      <div key={li} style={{ fontSize: 0, lineHeight: 0, textAlign: H_ALIGN[col] }}>
+        {line.map((seg, si) =>
+          isBlankText(seg.text) ? null : (
+            <span key={si} data-sub-seg="1" style={segStyle(seg, sy, resY, wrap)}>
+              {renderPieces(seg.text, starts[li][si], hits, uid)}
+            </span>
+          )
+        )}
+      </div>
+    );
+  });
 };
 
 /**

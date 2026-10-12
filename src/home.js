@@ -233,6 +233,9 @@ const Home = (props) => {
   const audioRef = useRef(null); // thẻ <audio> phát audio được chọn
   const audioTokenRef = useRef(0); // huỷ polling cũ khi chọn audio khác / đổi file
   const audioTargetRef = useRef(null); // audio đang được chọn (kể cả khi đang tách)
+  // Trạng thái popup mới nhất (handler back đọc từ đây, tránh closure cũ)
+  const popupRef = useRef({ trWord: false, boxTracks: false, boxAudio: false, boxSpeed: false, boxDelay: false });
+  popupRef.current = { trWord: !!trWord, boxTracks, boxAudio, boxSpeed, boxDelay };
 
   if (!_.isEmpty(textTracks) && !_.isEmpty(subtitles)) {
     const subtitle = subtitles.find((s) => s.default);
@@ -241,8 +244,38 @@ const Home = (props) => {
     }
   }
 
+  // Đóng popup đang mở (ưu tiên trên cùng). Trả về true nếu đã đóng được popup.
+  const closePopupIfOpen = () => {
+    const open = popupRef.current;
+    if (open.trWord) {
+      setTrWord(null);
+      popupRef.current = { ...open, trWord: false };
+    } else if (open.boxDelay) {
+      setBoxDelay(false);
+      popupRef.current = { ...open, boxDelay: false };
+    } else if (open.boxSpeed) {
+      setBoxSpeed(false);
+      popupRef.current = { ...open, boxSpeed: false };
+    } else if (open.boxAudio) {
+      setBoxAudio(false);
+      popupRef.current = { ...open, boxAudio: false };
+    } else if (open.boxTracks) {
+      setBoxTracks(false);
+      popupRef.current = { ...open, boxTracks: false };
+    } else {
+      return false;
+    }
+    if (!isMouse) setIndexFile(0);
+    return true;
+  };
+
   const onBackButtonEvent = (e) => {
-    window.history.pushState(null, null, window.location.pathname);
+    if (closePopupIfOpen()) {
+      // Có popup: chỉ đóng popup, giữ trang xem và "bẫy" lần back tiếp theo
+      window.history.pushState(null, null, window.location.pathname + window.location.search);
+      return;
+    }
+    window.history.pushState(null, null, window.location.pathname + window.location.search);
     history.replace(`/${backRootPath}`, { folder: _.last(fullPathRoot) });
   };
 
@@ -272,10 +305,8 @@ const Home = (props) => {
         .then((data) => setFilesOfParent(data.filter((d) => d.type === "file")));
     }
     window.addEventListener("fullscreenchange", onFullSreenEvent);
-    if (type !== "file") {
-      window.history.pushState(null, null, window.location.pathname);
-      window.addEventListener("popstate", onBackButtonEvent);
-    }
+    window.history.pushState(null, null, window.location.pathname + window.location.search);
+    window.addEventListener("popstate", onBackButtonEvent);
     return () => {
       window.removeEventListener("popstate", onBackButtonEvent);
       window.removeEventListener("fullscreenchange", onFullSreenEvent);
@@ -953,6 +984,8 @@ const Home = (props) => {
   const sizeBar = {
     // Nút điều khiển và chữ thời gian co giãn liên tục theo độ rộng khung video
     "--width-bar": barPx + "px",
+    // Không có phụ đề: bỏ khoảng trống dành cho phụ đề/thanh điều khiển (chỉ áp dụng khi có sub)
+    "--bar-gap": _.isEmpty(subtitles) ? "0px" : undefined,
     "--font-size": sizeW ? Math.round(Math.min(Math.max(sizeW / 90, touch ? 13 : 11), 26)) + "px" : "12px",
     // Chiều cao tối đa của popup chọn (sub / tốc độ / audio): không cao quá khung video (chỉ nghe: khung rất thấp nên cho tối đa 230px, popup mở lên trên)
     "--menu-max-h": audioOnly ? "230px" : videoH ? Math.max(videoH - barPx - 16, 80) + "px" : "70vh",
@@ -976,7 +1009,9 @@ const Home = (props) => {
   const onFullSreenEvent = (e) => {
     if (!document.fullscreenElement) {
       // TV: thoát full screen = quay về danh sách. PC: ở lại trang xem video.
-      if (!isMouse) history.replace(`/${backRootPath}`, { folder: _.last(fullPathRoot) });
+      // TV: thoát full screen = quay về danh sách, trừ khi đang có popup (popup sẽ do nút back đóng)
+      const popupOpen = Object.values(popupRef.current).some(Boolean);
+      if (!isMouse && !popupOpen) history.replace(`/${backRootPath}`, { folder: _.last(fullPathRoot) });
       setIsFullSreen(false);
       // Thoát full (kể cả bằng cử chỉ quay lại): về màn dọc, rồi trả lại chế độ tự xoay
       if (touch) lockOrient("portrait").then(() => setTimeout(unlockOrient, 600));
@@ -1073,6 +1108,11 @@ const Home = (props) => {
 
   const upDownVideoHandle = (action) => {
     if (boxDelay) {
+      if (!action && indexDelay === 0) {
+        setBoxDelay(false);
+        setIndexFile(0);
+        return;
+      }
       let newIndex = action ? indexDelay + 1 : indexDelay - 1;
       if (newIndex < 0) newIndex = 2;
       if (newIndex > 2) newIndex = 0;
@@ -1080,6 +1120,11 @@ const Home = (props) => {
       return;
     }
     if (boxAudio) {
+      if (!action && indexAudio === 0) {
+        setBoxAudio(false);
+        setIndexFile(0);
+        return;
+      }
       let newIndex = action ? indexAudio + 1 : indexAudio - 1;
       if (newIndex < 0) newIndex = audioList.length - 1;
       if (newIndex >= audioList.length) newIndex = 0;
@@ -1096,6 +1141,11 @@ const Home = (props) => {
       }
     } else {
       // Danh sách điều hướng: Sub 1 (Off + n sub) rồi tới Sub 2 (Off + các sub khác Sub 1), khi có từ 2 sub trở lên
+      if (!action && indexSub === 0) {
+        setBoxTracks(false);
+        setIndexFile(0);
+        return;
+      }
       const subCount = subtitles.length;
       const sub2Count = subCount > 1 ? subtitles.filter((sub) => sub.language !== activeSubLang).length + 1 : 0;
       const maxIndex = subCount + sub2Count;
@@ -1280,6 +1330,7 @@ const Home = (props) => {
             // Đang full screen thì Esc do trình duyệt xử lý (thoát full screen); lần sau mới quay về danh sách
             if (!document.fullscreenElement) {
               e.preventDefault();
+              if (closePopupIfOpen()) break;
               history.replace(`/${backRootPath}`, { folder: _.last(fullPathRoot) });
             }
             break;
@@ -1582,13 +1633,10 @@ const Home = (props) => {
                           setStateElm({ playing: !state.playing });
                         } else if (boxDelay) {
                           document.getElementsByClassName("d-active")[0]?.click();
-                          setIndexFile(0);
                         } else if (boxAudio) {
                           document.getElementsByClassName("a-active")[0]?.click();
-                          setIndexFile(0);
                         } else if (boxTracks) {
-                          document.getElementsByClassName("s-active")[0].click();
-                          setIndexFile(0);
+                          document.getElementsByClassName("s-active")[0]?.click();
                         } else {
                           document.getElementsByClassName("f-active")[0].click();
                         }
