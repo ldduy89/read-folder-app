@@ -7,7 +7,7 @@ export const ASS_DEFAULT_RES = { x: 1920, y: 1080 };
 export const DEFAULT_ASS_STYLE = {
   fontName: "Tahoma",
   fontSize: 0, // 0 = tự tính theo chiều cao khung (PlayResY / 18)
-  primary: "#ffd700",
+  primary: "#ffcc00",
   bold: true,
   italic: false,
   underline: false,
