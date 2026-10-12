@@ -21,10 +21,24 @@ const SUB_LINE_HEIGHT = 1.44;
 // Cỡ chữ sub tối đa theo tỉ lệ chiều cao hình video (mặc định khi file sub không đặt cỡ là 1/18 ≈ 0.056). Hạ số này nếu chữ vẫn to, tăng nếu muốn cho phép to hơn.
 const SUB_FONT_MAX_RATIO = 0.07;
 
-const segStyle = (seg, sy, resY, wrap) => ({
+// Hệ số thu nhỏ chung cho cả cue: nếu đoạn to nhất vượt trần (SUB_FONT_MAX_RATIO * chiều cao hình)
+// thì thu toàn bộ các đoạn trong cue theo cùng một tỉ lệ, giữ đúng tỉ lệ cỡ chữ giữa các đoạn
+const cueFontScale = (lines, sy, resY) => {
+  let maxFs = 0;
+  lines.forEach((line) =>
+    line.forEach((seg) => {
+      if (seg.text && seg.text.replace(/\u00a0/g, " ").trim()) maxFs = Math.max(maxFs, seg.fs || resY / 18);
+    })
+  );
+  const capPx = Math.max(resY * sy * SUB_FONT_MAX_RATIO, 8);
+  const maxPx = maxFs * sy;
+  return maxPx > capPx ? capPx / maxPx : 1;
+};
+
+const segStyle = (seg, sy, resY, wrap, scale = 1) => ({
   fontFamily: SUB_FONT_FORCE || !seg.font ? SUB_FONT : `"${seg.font}", ${SUB_FONT}`,
   // Chặn chữ sub quá to: file sub đặt cỡ chữ lớn thì cũng không vượt SUB_FONT_MAX_RATIO chiều cao hình (resY * sy = chiều cao hình)
-  fontSize: Math.min(Math.max((seg.fs || resY / 18) * sy, 8), Math.max(resY * sy * SUB_FONT_MAX_RATIO, 8)) + "px",
+  fontSize: Math.min(Math.max((seg.fs || resY / 18) * sy * scale, 8), Math.max(resY * sy * SUB_FONT_MAX_RATIO, 8)) + "px",
   fontWeight: seg.bold ? 700 : 400,
   fontStyle: seg.italic ? "italic" : "normal",
   textDecoration: [seg.underline && "underline", seg.strike && "line-through"].filter(Boolean).join(" ") || "none",
@@ -340,13 +354,14 @@ const renderLines = (parsed, sy, resY, col, wrap, saved, uid) => {
   const hits = findHits(parts.join(""), saved);
   // Bỏ các dòng/đoạn chỉ có khoảng trắng (&nbsp;): nếu không sẽ vẽ ra ô nền đen trống trên video
   const isBlankText = (t) => !t || !t.replace(/\u00a0/g, " ").trim();
+  const capScale = cueFontScale(parsed.lines, sy, resY);
   return parsed.lines.map((line, li) => {
     if (line.every((seg) => isBlankText(seg.text))) return null;
     return (
       <div key={li} style={{ fontSize: 0, lineHeight: 0, textAlign: H_ALIGN[col] }}>
         {line.map((seg, si) =>
           isBlankText(seg.text) ? null : (
-            <span key={si} data-sub-seg="1" style={segStyle(seg, sy, resY, wrap)}>
+            <span key={si} data-sub-seg="1" style={segStyle(seg, sy, resY, wrap, capScale)}>
               {renderPieces(seg.text, starts[li][si], hits, uid)}
             </span>
           )
