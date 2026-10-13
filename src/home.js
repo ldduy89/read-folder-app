@@ -54,8 +54,8 @@ const Home = (props) => {
   const trasksURL = `http://${hostname}:8081/trasks/`;
   const pickURL = `http://${hostname}:8081/pick/`;
   const audiosURL = `http://${hostname}:8081/audios/`;
-  const audioPrepareURL = `http://${hostname}:8081/audio-prepare/`;
-  const audioFileURL = `http://${hostname}:8081/audio-file/`;
+  const mediaPrepareURL = `http://${hostname}:8081/media-prepare/`;
+  const mediaURL = `http://${hostname}:8081/media-file/`;
   const sample_video = document.getElementById("sample_video");
   const video = document.getElementsByTagName("video")[0];
   const textTracks = _.get(video, "textTracks", null);
@@ -229,9 +229,10 @@ const Home = (props) => {
   const [indexAudio, setIndexAudio] = useState(0);
   const [toast, setToast] = useState("");
   const toastRef = useRef(null);
-  const [extAudio, setExtAudio] = useState(false); // đang phát audio ngoài (đã tách) đồng bộ với video
-  const audioRef = useRef(null); // thẻ <audio> phát audio được chọn
-  const audioTokenRef = useRef(0); // huỷ polling cũ khi chọn audio khác / đổi file
+  const [mediaSrc, setMediaSrc] = useState(null); // null = file gốc; có giá trị = file đã remux (video + audio đã chọn)
+  const resumeAtRef = useRef(null); // vị trí cần tua tới sau khi đổi nguồn video
+  const audioTokenRef = useRef(0);
+  const prepTimerRef = useRef(null); // đếm giây khi đang tách audio // huỷ polling cũ khi chọn audio khác / đổi file
   const audioTargetRef = useRef(null); // audio đang được chọn (kể cả khi đang tách)
   // Trạng thái popup mới nhất (handler back đọc từ đây, tránh closure cũ)
   const popupRef = useRef({ trWord: false, boxTracks: false, boxAudio: false, boxSpeed: false, boxDelay: false });
@@ -389,6 +390,7 @@ const Home = (props) => {
         if (!Array.isArray(data)) return;
         const defaultIndex = Math.max(_.findIndex(data, (a) => a.default), 0);
         setAudioList(data.map((a, i) => ({ label: a.label, isDefault: i === defaultIndex, enabled: i === defaultIndex })));
+
       })
       .catch(() => setAudioList([]));
   };
@@ -400,59 +402,65 @@ const Home = (props) => {
 
   const stopExternalAudio = () => {
     audioTokenRef.current = 0;
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
-    }
-    setExtAudio(false);
+    resumeAtRef.current = null;
+    setMediaSrc(null);
   };
 
-  const startExternalAudio = (index) => {
-    if (!audioRef.current) audioRef.current = new Audio();
-    const audio = audioRef.current;
-    audio.src = audioFileURL + encodedPathViewFile() + `?track=${index}`;
-    audio.preload = "auto";
-    audio.currentTime = playerRef.current ? playerRef.current.getCurrentTime() || 0 : 0;
-    setExtAudio(true);
+  const clearPrepTimer = () => {
+    clearInterval(prepTimerRef.current);
+    prepTimerRef.current = null;
   };
 
   const changeAudio = (index) => {
     const item = audioList[index];
     if (!item) return;
+    clearPrepTimer();
     audioTargetRef.current = index;
     const token = Date.now();
     audioTokenRef.current = token;
 
     if (item.isDefault) {
-      // Audio gốc: trình duyệt tự phát cùng video
-      stopExternalAudio();
-      audioTargetRef.current = index;
+      // Audio gốc: quay về file gốc, giữ nguyên vị trí phát
+      if (mediaSrc) {
+        resumeAtRef.current = playerRef.current ? playerRef.current.getCurrentTime() || 0 : 0;
+        setMediaSrc(null);
+      }
       markAudioEnabled(index);
       showToast(`Audio: ${item.label}`);
       return;
     }
 
-    showToast(`Đang chuẩn bị audio: ${item.label}...`, 0);
+    const startedAt = Date.now();
+    const showWaiting = () =>
+      showToast(`Đang chuẩn bị audio: ${item.label}... ${Math.round((Date.now() - startedAt) / 1000)}s`, 0);
+    showWaiting();
+    prepTimerRef.current = setInterval(() => {
+      if (audioTokenRef.current !== token) return clearPrepTimer();
+      showWaiting();
+    }, 1000);
+
     const poll = () => {
-      fetch(audioPrepareURL + encodedPathViewFile() + `?track=${index}`)
+      fetch(mediaPrepareURL + encodedPathViewFile() + `?track=${index}`)
         .then((response) => response.json())
         .then((data) => {
           if (audioTokenRef.current !== token) return; // đã chọn audio khác
           if (data.ready) {
-            startExternalAudio(index);
+            clearPrepTimer();
+            resumeAtRef.current = playerRef.current ? playerRef.current.getCurrentTime() || 0 : 0;
+            setMediaSrc(mediaURL + encodedPathViewFile() + `?track=${index}`);
             markAudioEnabled(index);
             showToast(`Audio: ${item.label}`);
           } else if (data.waiting) {
             setTimeout(poll, 1500);
           } else {
+            clearPrepTimer();
             audioTargetRef.current = null;
             showToast("Không tách được audio này", 3000);
           }
         })
         .catch(() => {
           if (audioTokenRef.current !== token) return;
+          clearPrepTimer();
           audioTargetRef.current = null;
           showToast("Không kết nối được server audio", 3000);
         });
@@ -480,38 +488,6 @@ const Home = (props) => {
     }
     setBoxAudio(!boxAudio);
   };
-
-  // Đồng bộ <audio> với trạng thái của video
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !extAudio) return;
-    audio.volume = state.volume;
-    audio.muted = state.muted;
-    audio.playbackRate = state.playbackRate;
-    if (state.playing) audio.play().catch(() => {});
-    else audio.pause();
-  }, [extAudio, state.playing, state.volume, state.muted, state.playbackRate]);
-
-  // Sửa lệch giữa audio và video (> 0.3s)
-  useEffect(() => {
-    if (!extAudio) return;
-    const id = setInterval(() => {
-      const audio = audioRef.current;
-      const player = playerRef.current;
-      if (!audio || !player) return;
-      const t = player.getCurrentTime() || 0;
-      if (Math.abs(audio.currentTime - t) > 0.3) audio.currentTime = t;
-    }, 500);
-    return () => clearInterval(id);
-  }, [extAudio]);
-
-  // Rời trang: dừng audio
-  useEffect(() => {
-    return () => {
-      audioTokenRef.current = 0;
-      if (audioRef.current) audioRef.current.pause();
-    };
-  }, []);
 
   const changeSubtitle = (language, noSetSub) => {
     if (textTracks && textTracks.length > 0) {
@@ -1653,19 +1629,20 @@ const Home = (props) => {
                         className="react-player vlite-js"
                         // style={{ "--shadow": borderText(5, "#000") }}
                         controls={state.controls}
-                        url={publicURL + pathViewFile}
+                        url={mediaSrc || publicURL + pathViewFile}
                         pip={state.pip}
                         playing={state.playing}
                         light={state.light}
                         loop={state.loop}
                         playbackRate={state.playbackRate}
                         volume={state.volume}
-                        muted={state.muted || extAudio}
-                        onSeek={(seconds) => {
-                          if (extAudio && audioRef.current) audioRef.current.currentTime = seconds;
+                        muted={state.muted}
+                        onReady={() => {
+                          if (resumeAtRef.current !== null && playerRef.current) {
+                            playerRef.current.seekTo(resumeAtRef.current, "seconds");
+                            resumeAtRef.current = null;
+                          }
                         }}
-                        onBuffer={() => extAudio && audioRef.current && audioRef.current.pause()}
-                        onBufferEnd={() => extAudio && state.playing && audioRef.current && audioRef.current.play().catch(() => {})}
                         onDuration={(duration) => setStateElm({ duration: duration })}
                         onEnded={() => handleActionFile(nextFile, backRootPath)}
                         onProgress={(stage) => setStateElm({ played: stage.played })}
