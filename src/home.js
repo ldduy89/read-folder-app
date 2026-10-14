@@ -168,6 +168,7 @@ const Home = (props) => {
   const stacked = isMouse && !fsSide && (view.h > view.w || view.w < 640);
   // Chế độ chỉ nghe tiếng: ẩn hình (video vẫn chạy), khung phụ đề chiếm chỗ của video, bấm vào chữ để tô đen / dịch
   const [audioOnly, setAudioOnly] = useState(false);
+  const [cuePanelHidden, setCuePanelHidden] = useState(false); // ẩn khung phụ đề bên phải (danh sách câu)
   const layoutStacked = stacked || audioOnly; // chỉ nghe thì luôn xếp dọc: thanh điều khiển gọn ở trên, danh sách sub phía dưới
 
   // Điện thoại: nhấn giữ + kéo cột chọn để bôi đen KHÔNG phát mouseup nên không dịch được như trên PC.
@@ -1528,11 +1529,27 @@ const Home = (props) => {
                       <span className="App-toolLabel">{audioOnly ? "Hiện video" : "Chỉ nghe"}</span>
                     </button>
                   )}
+                  {type === "file" && !_.isEmpty(subtitles) && (
+                    <button
+                      type="button"
+                      className={`App-tool App-toolBtn ${cuePanelHidden ? "on" : ""}`}
+                      onClick={() => setCuePanelHidden(!cuePanelHidden)}
+                      aria-pressed={cuePanelHidden}
+                      title={cuePanelHidden ? "Hiện khung phụ đề bên phải" : "Ẩn khung phụ đề bên phải"}
+                      aria-label={cuePanelHidden ? "Hiện khung phụ đề" : "Ẩn khung phụ đề"}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 36 36" fill="currentColor" aria-hidden="true">
+                        <path d="M5 8h18v20H5zm20 0h6v20h-6z" />
+                        {cuePanelHidden && <path d="M4 4l28 28" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />}
+                      </svg>
+                      <span className="App-toolLabel">{cuePanelHidden ? "Hiện khung sub" : "Ẩn khung sub"}</span>
+                    </button>
+                  )}
                   <a className="App-tool" href="/translate-words" target="_blank" rel="noopener noreferrer" title="Danh sách từ đã lưu" aria-label="Từ đã lưu">
                     <span aria-hidden="true">★</span>
                     <span className="App-toolLabel">Từ đã lưu</span>
                   </a>
-                  <a className="App-tool" href="/translate-words?settings=1" target="_blank" rel="noopener noreferrer" title="Cấu hình dịch: ngôn ngữ, Gemini, đồng bộ Google Sheet" aria-label="Cấu hình dịch">
+                  <a className="App-tool" href="/translate-settings" target="_blank" rel="noopener noreferrer" title="Cấu hình dịch: ngôn ngữ, Gemini, đồng bộ Google Sheet" aria-label="Cấu hình dịch">
                     <span aria-hidden="true">⚙</span>
                     <span className="App-toolLabel">Cấu hình dịch</span>
                   </a>
@@ -2167,7 +2184,7 @@ const Home = (props) => {
                     </div>
                   </div>
                 </div>
-                {isMouse && !_.isEmpty(subtitles) && (!fsSide || sideOpen) && (
+                {isMouse && !_.isEmpty(subtitles) && (!fsSide || sideOpen) && !cuePanelHidden && (
                   <div
                     id="cue_panel"
                     {...hoverSavedHandlers(openTranslate)}

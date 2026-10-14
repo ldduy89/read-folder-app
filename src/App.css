@@ -962,3 +962,25 @@ img {
   border-color: #ffd700;
   background: rgba(255, 215, 0, 0.2);
 }
+
+
+/* Thanh công cụ luôn hiện đủ nút: thanh đường dẫn co lại, nút được xuống dòng thay vì bị đẩy ra ngoài */
+.App-pathbar {
+  min-width: 0;
+}
+.App-path {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+.App-tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Chừa khoảng cách phía trên cho thanh đường dẫn và nút công cụ, không sát mép màn hình */
+.App-pathbar {
+  padding-top: 16px;
+}

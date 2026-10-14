@@ -1,8 +1,8 @@
 // translateWords.js — trang "Từ đã lưu" + cài đặt dịch, mở ở /translate-words (chuyển từ words.html / options.html của extension)
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { apiBaseOf, apiGet, apiPost, copyText, createSpeaker, getTarget, getWords, setTarget, setWords, syncNow, syncOps } from "./translateLib";
+import { apiBaseOf, copyText, createSpeaker, getWords, setWords, syncNow, syncOps } from "./translateLib";
 
-const CSS = `
+export const CSS = `
 .tw{--bg:#fff;--fg:#202124;--muted:#5f6368;--line:#e3e5e8;--hover:#f3f7fd;--head:#f8f9fa;--accent:#1a73e8;min-height:100vh;background:var(--bg);color:var(--fg);font:13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;box-sizing:border-box}
 @media (prefers-color-scheme: dark){.tw{--bg:#202124;--fg:#e8eaed;--muted:#9aa0a6;--line:#3c4043;--hover:#2a2d31;--head:#292b2f;--accent:#8ab4f8}}
 .tw *{box-sizing:border-box}
@@ -206,7 +206,6 @@ const Words = () => {
   const [open, setOpen] = useState({});
   const [toast, setToast] = useState(null); // { text, undo }
   const [sync, setSync] = useState({ busy: false, text: "", err: false });
-  const [showSet, setShowSet] = useState(() => new URLSearchParams(window.location.search).get("settings") === "1"); // /translate-words?settings=1 mở sẵn cấu hình
 
   useEffect(() => {
     document.title = "Từ đã lưu";
@@ -340,7 +339,6 @@ const Words = () => {
                 if (v === "sync") doSync();
                 else if (v === "import") fileRef.current && fileRef.current.click();
                 else if (v === "export") exportCsv();
-                else if (v === "settings") setShowSet((x) => !x);
               }}
             >
               <option value="">⋯</option>
@@ -349,8 +347,10 @@ const Words = () => {
               </option>
               <option value="import">Nhập CSV</option>
               <option value="export">Xuất CSV</option>
-              <option value="settings">{showSet ? "Đóng cài đặt" : "Cài đặt"}</option>
             </select>
+            <a className="btn" href="/translate-settings" target="_blank" rel="noopener noreferrer" title="Cài đặt dịch">
+              Cài đặt dịch
+            </a>
             <input
               ref={fileRef}
               type="file"
@@ -364,7 +364,6 @@ const Words = () => {
             />
             {sync.text && <span className={"syncstate" + (sync.err ? " err" : "")}>{sync.text}</span>}
           </div>
-          {showSet && <Settings apiBase={apiBase} host={rootRef} />}
           <div className="kinds">
             <button type="button" className={"kind" + (kind === "word" ? " on" : "")} onClick={() => setKind("word")}>
               Từ <small>{kindCount.word}</small>
@@ -460,137 +459,6 @@ const Words = () => {
           {toast.undo && <button onClick={undo}>Hoàn tác</button>}
         </div>
       )}
-    </div>
-  );
-};
-
-// ---------- Cài đặt: ngôn ngữ đích, Gemini, đồng bộ Google Sheet ----------
-const Settings = ({ apiBase, host }) => {
-  const [cfg, setCfg] = useState(null);
-  const [target, setTargetState] = useState(getTarget());
-  const [gKey, setGKey] = useState("");
-  const [gModel, setGModel] = useState("");
-  const [sUrl, setSUrl] = useState("");
-  const [sSecret, setSSecret] = useState("");
-  const [msg, setMsg] = useState({ g: null, s: null, t: null });
-  const say = (k, text, ok) => setMsg((m) => ({ ...m, [k]: text ? { text, ok } : null }));
-
-  const load = () =>
-    apiGet(apiBase, "/translate-config")
-      .then((c) => {
-        setCfg(c);
-        setGModel(c.geminiModel || "");
-        setSUrl(c.syncUrl || "");
-      })
-      .catch(() => setCfg(false));
-  useEffect(() => {
-    load();
-  }, []);
-
-  if (cfg === false) return <div className="settings err">Không kết nối được máy chủ (cổng 8081).</div>;
-  if (!cfg) return <div className="settings">Đang tải…</div>;
-
-  const post = (path, body) => apiPost(apiBase, path, body).catch(() => ({ ok: false, error: "Không kết nối được máy chủ." }));
-
-  const saveTarget = () => {
-    const t = target.trim() || "vi";
-    setTarget(t);
-    setTargetState(t);
-    say("t", "Đã lưu ✓", true);
-  };
-  const saveGemini = async () => {
-    const body = { geminiModel: gModel };
-    if (gKey.trim()) body.geminiKey = gKey; // để trống = giữ key cũ
-    const r = await post("/translate-config", body);
-    if (r.ok) {
-      setGKey("");
-      await load();
-    }
-    say("g", r.ok ? "Đã lưu ✓" : r.error, r.ok);
-  };
-  const clearGemini = async () => {
-    const r = await post("/translate-config", { geminiKey: "" });
-    if (r.ok) await load();
-    say("g", r.ok ? "Đã xóa key ✓" : r.error, r.ok);
-  };
-  const testGemini = async () => {
-    say("g", "Đang thử…", true);
-    const r = await post("/gemini-test", { key: gKey, model: gModel });
-    say("g", r.ok ? `Dùng được ✓ (they're all over him → ${r.sample})` : r.error, r.ok);
-  };
-  const saveSync = async () => {
-    const body = { syncUrl: sUrl };
-    if (sSecret.trim()) body.syncSecret = sSecret; // để trống = giữ mã cũ
-    const r = await post("/translate-config", body);
-    if (r.ok) {
-      setSSecret("");
-      await load();
-    }
-    say("s", r.ok ? "Đã lưu ✓" : r.error, r.ok);
-  };
-  const testSync = async () => {
-    say("s", "Đang thử…", true);
-    const r = await post("/sync-test", { url: sUrl, secret: sSecret });
-    say("s", r.ok ? `Kết nối được ✓ (${r.count} từ trên Sheet)` : r.error, r.ok);
-  };
-
-  const Msg = ({ k }) => (msg[k] ? <span className={msg[k].ok ? "ok" : "err"}>{msg[k].text}</span> : null);
-
-  return (
-    <div className="settings">
-      <h2>Ngôn ngữ đích</h2>
-      <div className="row">
-        <input type="text" style={{ width: 90 }} value={target} onChange={(e) => setTargetState(e.target.value)} placeholder="vi" />
-        <button className="btn" onClick={saveTarget}>
-          Lưu
-        </button>
-        <Msg k="t" />
-        <span className="syncstate">Mã ngôn ngữ, ví dụ vi, en, ja. Áp dụng cho trình duyệt này.</span>
-      </div>
-
-      <h2>Gemini (dịch cụm từ / câu)</h2>
-      <label>
-        API key {cfg.hasGeminiKey ? "(đã có key, để trống nếu giữ nguyên)" : "(chưa có, bỏ trống thì dùng Google Translate)"}
-        <input type="password" value={gKey} onChange={(e) => setGKey(e.target.value)} autoComplete="off" placeholder={cfg.hasGeminiKey ? "••••••••" : ""} />
-      </label>
-      <label>
-        Model
-        <input type="text" value={gModel} onChange={(e) => setGModel(e.target.value)} />
-      </label>
-      <div className="row">
-        <button className="btn" onClick={saveGemini}>
-          Lưu
-        </button>
-        <button className="btn" onClick={testGemini}>
-          Thử
-        </button>
-        {cfg.hasGeminiKey && (
-          <button className="btn" onClick={clearGemini}>
-            Xóa key
-          </button>
-        )}
-        <Msg k="g" />
-      </div>
-
-      <h2>Đồng bộ Google Sheet</h2>
-      <label>
-        URL Apps Script (kết thúc bằng /exec)
-        <input type="text" value={sUrl} onChange={(e) => setSUrl(e.target.value)} />
-      </label>
-      <label>
-        Mã bí mật {cfg.hasSyncSecret ? "(đã có, để trống nếu giữ nguyên)" : ""}
-        <input type="password" value={sSecret} onChange={(e) => setSSecret(e.target.value)} autoComplete="off" placeholder={cfg.hasSyncSecret ? "••••••••" : ""} />
-      </label>
-      <div className="row">
-        <button className="btn" onClick={saveSync}>
-          Lưu
-        </button>
-        <button className="btn" onClick={testSync}>
-          Thử kết nối
-        </button>
-        <Msg k="s" />
-      </div>
-      <span className="syncstate">Key và mã bí mật được lưu trong file translate-config.json trên máy chạy server, không gửi về trình duyệt.</span>
     </div>
   );
 };

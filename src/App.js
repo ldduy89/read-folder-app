@@ -11,6 +11,7 @@ import {
 import Home from "./home";
 import Read from "./read";
 import TranslateWords from "./translateWords";
+import TranslateSettings from "./translateSettings";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           we passes the imported component*/}
           <Route exact path="/read/*" component={Read} />
           <Route exact path="/translate-words" component={TranslateWords} />
+          <Route exact path="/translate-settings" component={TranslateSettings} />
           <Route exact path="/*" component={Home} />
 
           
