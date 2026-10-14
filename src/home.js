@@ -2198,17 +2198,19 @@ const Home = (props) => {
                     }}
                     onTouchStart={(e) => {
                       userScrollRef.current = Date.now();
-                      if (touch) swipeCue.onTouchStart(e);
+                      if (touch && audioOnly) swipeCue.onTouchStart(e);
                     }}
                     onTouchMove={(e) => {
-                      if (touch) swipeCue.onTouchMove(e);
+                      if (touch && audioOnly) swipeCue.onTouchMove(e);
                     }}
                     onTouchEnd={() => {
-                      if (touch) swipeCue.onTouchEnd();
+                      if (touch && audioOnly) swipeCue.onTouchEnd();
                     }}
                     style={{
-                      touchAction: touch ? "pan-y" : undefined, // cuộn dọc như thường, quẹt ngang để chọn chữ
-                      width: fsSide ? "min(320px, 42vw)" : layoutStacked ? "100%" : "min(360px, 40vw)",
+                      touchAction: touch && audioOnly ? "pan-y" : undefined, // cuộn dọc như thường, quẹt ngang để chọn chữ
+                      userSelect: audioOnly ? "text" : undefined,
+                      WebkitUserSelect: audioOnly ? "text" : undefined,
+                      width: fsSide ? "max(200px, 25vw)" : layoutStacked ? "100%" : "min(360px, 40vw)",
                       flexShrink: 0,
                       height: fsSide ? "100%" : audioOnly ? "max(240px, calc(100vh - 130px))" : stacked ? "50vh" : "80vh", // chỉ nghe: khung sub chiếm gần hết phần còn lại của màn hình
                       maxWidth: audioOnly ? "900px" : undefined,
@@ -2219,7 +2221,7 @@ const Home = (props) => {
                       color: "#ddd",
                       textAlign: "left",
                       cursor: "default",
-                      fontSize: audioOnly ? "17px" : "15px",
+                      fontSize: fsSide ? "13px" : audioOnly ? "17px" : "15px", // toàn màn hình: khung hẹp nên chữ nhỏ hơn
                       lineHeight: 1.4,
                       borderRadius: fsSide ? 0 : "6px"
                     }}
@@ -2246,7 +2248,7 @@ const Home = (props) => {
                           }}
                         >
                           <div style={{ flex: 1 }}>
-                            <span style={{ color: "#777", fontSize: "12px", marginRight: "8px" }}>{formatClock(cue.start)}</span>
+                            <span style={{ color: "#777", fontSize: fsSide ? "10px" : "12px", marginRight: "8px" }}>{formatClock(cue.start)}</span>
                             <span data-sub-seg="1" style={audioOnly ? { cursor: "text", userSelect: "text", WebkitUserSelect: "text" } : undefined}>
                               {highlightSaved(cue.text, savedMatcher, "c" + i)}
                             </span>
@@ -2261,12 +2263,16 @@ const Home = (props) => {
                               }}
                               style={{
                                 flexShrink: 0,
-                                width: touch ? "36px" : "28px",
-                                height: touch ? "36px" : "28px",
+                                width: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
+                                height: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
                                 borderRadius: "50%",
                                 border: "1px solid #5aa564",
                                 background: "transparent",
                                 color: "#7fcf8a",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                lineHeight: 1,
                                 fontSize: "13px",
                                 padding: 0,
                                 cursor: "pointer"
@@ -2285,14 +2291,17 @@ const Home = (props) => {
                             }}
                             style={{
                               flexShrink: 0,
-                              width: touch ? "36px" : "28px",
-                              height: touch ? "36px" : "28px",
+                              width: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
+                              height: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
                               borderRadius: "50%",
                               border: "1px solid " + (i === loopIndex ? "#ffd700" : "#444"),
                               background: i === loopIndex ? "#ffd700" : "transparent",
                               color: i === loopIndex ? "#000" : "#888",
                               fontSize: "14px",
-                              lineHeight: touch ? "34px" : "26px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              lineHeight: 1,
                               padding: 0,
                               cursor: "pointer"
                             }}
