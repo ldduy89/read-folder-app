@@ -7,7 +7,7 @@ import ReactPlayer from "react-player";
 import _ from "lodash";
 import Duration from "./Duration";
 import { plainCueText } from "./assText";
-import { buildAssLayer, buildSavedMatcher, highlightSaved, hoverSavedHandlers, wordSelectHandlers, recentWordSelect } from "./assLayer";
+import { buildAssLayer, buildSavedMatcher, highlightSaved, hoverSavedHandlers, wordSelectHandlers, swipeSelectHandlers, recentWordSelect } from "./assLayer";
 import { getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
 import TranslatePopup from "./translatePopup";
 import { isTV, isTouch } from "./device";
@@ -236,6 +236,7 @@ const Home = (props) => {
   const prepTimerRef = useRef(null); // đếm giây khi đang tách audio // huỷ polling cũ khi chọn audio khác / đổi file
   const audioTargetRef = useRef(null); // audio đang được chọn (kể cả khi đang tách)
   // Trạng thái popup mới nhất (handler back đọc từ đây, tránh closure cũ)
+  const swipeCue = swipeSelectHandlers({ onWord: openTranslate });
   const popupRef = useRef({ trWord: false, boxTracks: false, boxAudio: false, boxSpeed: false, boxDelay: false });
   popupRef.current = { trWord: !!trWord, boxTracks, boxAudio, boxSpeed, boxDelay };
 
@@ -666,7 +667,7 @@ const Home = (props) => {
 
   // Đọc cue từ track phụ đề đang chọn (đọc lại khi đổi độ trễ vì thời gian cue đã bị dịch)
   useEffect(() => {
-    if (!isMouse || type !== "file" || !activeSubLang) return;
+    if (!(isMouse || audioOnly) || type !== "file" || !activeSubLang) return;
     let timer;
     let tries = 0;
     const load = () => {
@@ -685,11 +686,11 @@ const Home = (props) => {
     };
     load();
     return () => clearTimeout(timer);
-  }, [activeSubLang, subDelay, pathViewFile]);
+  }, [activeSubLang, subDelay, pathViewFile, audioOnly]);
 
   // Theo dõi thời gian video -> highlight cue hiện tại và cuộn tới nó
   useEffect(() => {
-    if (!isMouse || _.isEmpty(cueList)) return;
+    if (!(isMouse || audioOnly) || _.isEmpty(cueList)) return;
     const id = setInterval(() => {
       const player = playerRef.current;
       if (!player) return;
@@ -719,7 +720,7 @@ const Home = (props) => {
       }
     }, 250);
     return () => clearInterval(id);
-  }, [cueList]);
+  }, [cueList, audioOnly]);
 
   // Mở khung sub bên cạnh: cuộn tới câu đang phát
   useEffect(() => {
@@ -2184,7 +2185,7 @@ const Home = (props) => {
                     </div>
                   </div>
                 </div>
-                {isMouse && !_.isEmpty(subtitles) && (!fsSide || sideOpen) && !cuePanelHidden && (
+                {(isMouse || audioOnly) && !_.isEmpty(subtitles) && (!fsSide || sideOpen) && !cuePanelHidden && (
                   <div
                     id="cue_panel"
                     {...hoverSavedHandlers(openTranslate)}
@@ -2195,8 +2196,18 @@ const Home = (props) => {
                       // Chỉ nghe: bấm vào chữ thì tạm dừng để bôi đen / đọc nghĩa kịp (giống chữ sub trên video)
                       if (audioOnly && state.playing && e.target && e.target.closest && e.target.closest("[data-sub-seg]")) setStateElm({ playing: false });
                     }}
-                    onTouchStart={() => (userScrollRef.current = Date.now())}
+                    onTouchStart={(e) => {
+                      userScrollRef.current = Date.now();
+                      if (touch) swipeCue.onTouchStart(e);
+                    }}
+                    onTouchMove={(e) => {
+                      if (touch) swipeCue.onTouchMove(e);
+                    }}
+                    onTouchEnd={() => {
+                      if (touch) swipeCue.onTouchEnd();
+                    }}
                     style={{
+                      touchAction: touch ? "pan-y" : undefined, // cuộn dọc như thường, quẹt ngang để chọn chữ
                       width: fsSide ? "min(320px, 42vw)" : layoutStacked ? "100%" : "min(360px, 40vw)",
                       flexShrink: 0,
                       height: fsSide ? "100%" : audioOnly ? "max(240px, calc(100vh - 130px))" : stacked ? "50vh" : "80vh", // chỉ nghe: khung sub chiếm gần hết phần còn lại của màn hình

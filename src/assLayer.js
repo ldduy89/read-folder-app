@@ -36,6 +36,7 @@ const cueFontScale = (lines, sy, resY) => {
 };
 
 const segStyle = (seg, sy, resY, wrap, scale = 1) => ({
+  touchAction: "none", // không để trình duyệt tự cuộn / vuốt khi người dùng quẹt ngang trên chữ sub
   fontFamily: SUB_FONT_FORCE || !seg.font ? SUB_FONT : `"${seg.font}", ${SUB_FONT}`,
   // Chặn chữ sub quá to: file sub đặt cỡ chữ lớn thì cũng không vượt SUB_FONT_MAX_RATIO chiều cao hình (resY * sy = chiều cao hình)
   fontSize: Math.min(Math.max((seg.fs || resY / 18) * sy * scale, 8), Math.max(resY * sy * SUB_FONT_MAX_RATIO, 8)) + "px",
@@ -168,6 +169,60 @@ export const wordSelectHandlers = (opts) => ({
     dblClickWord(e, opts);
   },
   onMouseUp: (e) => manualSelect(e, opts)
+});
+
+// Quẹt ngón tay trên chữ sub (điện thoại): từ ở điểm bắt đầu tới từ ở điểm hiện tại đều được bôi đen,
+// kể cả từ/cụm đã lưu nằm trong khoảng quẹt. Nhấc tay thì dịch cả đoạn đã bôi đen một lần.
+// Ngón tay có thể đang ở khoảng trắng giữa hai từ (nhất là khi quẹt sang phải), nên thử thêm các điểm lân cận
+const SWIPE_NUDGES = [0, -4, 4, -8, 8, -12, 12];
+const pointWordRange = (x, y) => {
+  for (const dx of SWIPE_NUDGES) {
+    const el = document.elementFromPoint(x + dx, y);
+    const r = el ? wordRangeAt(el, x + dx, y) : null;
+    if (r) return r;
+  }
+  return null;
+};
+// Trạng thái quẹt để ở mức module: khung sub re-render giữa chừng thì không làm mất điểm bắt đầu
+const swipeState = { start: null, last: null };
+export const swipeSelectHandlers = (opts) => ({
+    onTouchStart: (e) => {
+      const p = e.touches[0];
+      const found = p && wordRangeAt(e.target, p.clientX, p.clientY);
+      swipeState.start = found ? found.range : null;
+      swipeState.last = null;
+    },
+    onTouchMove: (e) => {
+      const startRange = swipeState.start;
+      if (!startRange) return;
+      const p = e.touches[0];
+      const cur = p && pointWordRange(p.clientX, p.clientY);
+      if (!cur) return;
+      const a = startRange;
+      const b = cur.range;
+      const forward = a.compareBoundaryPoints(Range.START_TO_START, b) <= 0;
+      const from = forward ? a : b;
+      const to = forward ? b : a;
+      const r = document.createRange();
+      r.setStart(from.startContainer, from.startOffset);
+      r.setEnd(to.endContainer, to.endOffset);
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(r);
+      }
+      swipeState.last = r;
+    },
+    onTouchEnd: () => {
+      const r = swipeState.last;
+      swipeState.start = null;
+      swipeState.last = null;
+      if (!r) return;
+      const text = r.toString().replace(/\s+/g, " ").trim();
+      if (!text) return;
+      lastSelectAt = Date.now(); // để chỗ nghe selectionchange không dịch lặp lại
+      if (opts && opts.onWord) opts.onWord(text, anchorOf(r));
+    }
 });
 
 // Cue có \pos: neo theo toạ độ của sub, nhưng nếu khối chữ rộng hơn khoảng trống thì đẩy lại cho nằm trọn trong khung hình
@@ -528,6 +583,7 @@ export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
         dblClickWord(e, opts);
       }}
       onMouseUp={(e) => manualSelect(e, opts)}
+      {...swipeSelectHandlers(opts)}
       {...(opts.hover ? hoverSavedHandlers(opts.onWord) : {})}
       // Không chặn dblclick: lớp phụ đề không nằm trong lớp bắt phóng to nên không cần, và chặn sẽ làm sự kiện không tới được tiện ích tra từ
       onMouseDown={(e) => {
