@@ -546,6 +546,7 @@ const Home = (props) => {
   // ---------- Danh sách phụ đề bên cạnh video (PC) ----------
   const [cueList, setCueList] = useState([]); // [{ start, end, text }]
   const [cueIndex, setCueIndex] = useState(-1); // cue đang được phát (-1: không có)
+  const [gap, setGap] = useState(null); // khoảng trống giữa hai sub: { next: idx sub kế tiếp, p: tỉ lệ đã trôi 0..1 }
   const [loopIndex, setLoopIndex] = useState(-1); // cue đang bật lặp lại (-1: tắt)
   const loopWaitRef = useRef(false); // khoá ngắn sau mỗi lần tua lặp
   const loopTimerRef = useRef(null);
@@ -709,6 +710,18 @@ const Home = (props) => {
       }
       const live = found >= 0 && t < cueList[found].end ? found : -1;
       setCueIndex((prev) => (prev === live ? prev : live));
+      // Khi không có sub đang hiện: tính tỉ lệ thời gian đã trôi từ lúc sub trước kết thúc tới lúc sub kế tiếp bắt đầu
+      let nextGap = null;
+      const nextIdx = found + 1;
+      if (live === -1 && nextIdx < cueList.length) {
+        const gapStart = found >= 0 ? cueList[found].end : 0;
+        const gapEnd = cueList[nextIdx].start;
+        if (gapEnd - gapStart > 2) { // chỉ hiện thanh khi khoảng trống giữa hai sub trên 2 giây
+          const p = Math.min(1, Math.max(0, (t - gapStart) / (gapEnd - gapStart)));
+          nextGap = { next: nextIdx, p: Math.round(p * 100) / 100 };
+        }
+      }
+      setGap((prev) => (JSON.stringify(prev) === JSON.stringify(nextGap) ? prev : nextGap));
       if (found !== lastCueRef.current) {
         lastCueRef.current = found;
         const panel = document.getElementById("cue_panel");
@@ -2232,9 +2245,14 @@ const Home = (props) => {
                       <div style={{ padding: "16px", color: "#888" }}>Đang tải phụ đề...</div>
                     ) : (
                       cueList.map((cue, i) => (
+                        <React.Fragment key={i}>
+                        {gap && gap.next === i && (
+                          <div title="Còn bao lâu đến sub tiếp theo" style={{ height: 3, margin: "6px 10px 0", background: "#333", borderRadius: 2, overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${gap.p * 100}%`, background: "#ffd700", transition: "width .25s linear" }} />
+                          </div>
+                        )}
                         <div
                           id={`cue_${i}`}
-                          key={i}
                           onClick={audioOnly ? undefined : () => seekToCue(cue)} // chỉ nghe: bấm vào chữ để tô đen / dịch, đi tới câu bằng nút riêng
                           style={{
                             padding: "6px 10px",
@@ -2309,6 +2327,7 @@ const Home = (props) => {
                             ⟲
                           </button>
                         </div>
+                        </React.Fragment>
                       ))
                     )}
                   </div>
