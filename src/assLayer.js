@@ -5,7 +5,7 @@ const H_ALIGN = ["left", "center", "right"];
 const TEXT_BOX = "#000"; // nền chữ đen đặc (đổi thành "transparent" nếu muốn bỏ nền)
 
 // Font phụ đề (khai báo @font-face trong App.css)
-const SUB_FONT = '"UVN La Xanh", Tahoma, sans-serif';
+const SUB_FONT = '"Open Sans", Tahoma, Verdana, sans-serif'; // font phụ đề trên video
 // true: mọi sub dùng font trên; false: sub ASS nào khai báo font riêng thì dùng font đó, font trên chỉ là dự phòng
 const SUB_FONT_FORCE = true;
 // Màu chữ sub: màu mặc định của app (DEFAULT_ASS_STYLE.primary, vàng) thay cho màu khai báo trong file sub (có sub chọn màu khó nhìn)
@@ -40,7 +40,7 @@ const segStyle = (seg, sy, resY, wrap, scale = 1) => ({
   fontFamily: SUB_FONT_FORCE || !seg.font ? SUB_FONT : `"${seg.font}", ${SUB_FONT}`,
   // Chặn chữ sub quá to: file sub đặt cỡ chữ lớn thì cũng không vượt SUB_FONT_MAX_RATIO chiều cao hình (resY * sy = chiều cao hình)
   fontSize: Math.min(Math.max((seg.fs || resY / 18) * sy * scale, 8), Math.max(resY * sy * SUB_FONT_MAX_RATIO, 8)) + "px",
-  fontWeight: seg.bold ? 700 : 400,
+  fontWeight: 600, // độ đậm chữ phụ đề (ghi đè cả khi file sub đặt in đậm)
   fontStyle: seg.italic ? "italic" : "normal",
   textDecoration: [seg.underline && "underline", seg.strike && "line-through"].filter(Boolean).join(" ") || "none",
   color: SUB_COLOR_FORCE && !seg.keepColor ? SUB_COLOR : seg.color,
@@ -390,7 +390,49 @@ const renderPieces = (text, offset, hits, uid) => {
 export const highlightSaved = (text, saved, uid = "p") => renderPieces(text, 0, findHits(text, saved), uid);
 
 // Ghép cả cue thành một chuỗi (xuống dòng \N = 1 dấu cách) rồi mới khớp, để câu đã lưu nằm trên nhiều dòng / nhiều đoạn chữ vẫn được tô sáng
+// Dòng sub dài hơn SUB_MAX_CHARS ký tự được tách thành 2 dòng: điểm cắt là dấu cách gần giữa câu nhất,
+// để 2 dòng dài gần bằng nhau (không còn cảnh một chữ lẻ nằm riêng ở dòng dưới). Giữ nguyên màu/kiểu của từng đoạn.
+const SUB_MAX_CHARS = 48;
+const balanceLines = (lines) => {
+  const out = [];
+  lines.forEach((line) => {
+    const text = line.map((seg) => seg.text).join("");
+    if (text.trim().length <= SUB_MAX_CHARS) {
+      out.push(line);
+      return;
+    }
+    const mid = text.length / 2;
+    let best = -1;
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === " " && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+    }
+    if (best <= 0) {
+      out.push(line);
+      return;
+    }
+    const first = [];
+    const second = [];
+    let pos = 0;
+    line.forEach((seg) => {
+      const start = pos;
+      const end = pos + seg.text.length;
+      if (end <= best) first.push(seg);
+      else if (start > best) second.push(seg);
+      else {
+        const cut = best - start;
+        if (cut > 0) first.push({ ...seg, text: seg.text.slice(0, cut) });
+        const rest = seg.text.slice(cut + 1);
+        if (rest) second.push({ ...seg, text: rest });
+      }
+      pos = end;
+    });
+    out.push(first, second);
+  });
+  return out;
+};
+
 const renderLines = (parsed, sy, resY, col, wrap, saved, uid) => {
+  parsed = { ...parsed, lines: balanceLines(parsed.lines) };
   const starts = [];
   const parts = [];
   let pos = 0;
