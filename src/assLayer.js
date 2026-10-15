@@ -5,9 +5,24 @@ const H_ALIGN = ["left", "center", "right"];
 const TEXT_BOX = "#000"; // nền chữ đen đặc (đổi thành "transparent" nếu muốn bỏ nền)
 
 // Font phụ đề (khai báo @font-face trong App.css)
-const SUB_FONT = '"Open Sans", Tahoma, Verdana, sans-serif'; // font phụ đề trên video
+const SUB_FONT = 'Helvetica, Arial, "Open Sans", sans-serif'; // font phụ đề trên video
 // true: mọi sub dùng font trên; false: sub ASS nào khai báo font riêng thì dùng font đó, font trên chỉ là dự phòng
 const SUB_FONT_FORCE = true;
+// Font người dùng chọn cho sub trên video (rỗng = SUB_FONT mặc định)
+export const SUB_FONT_CHOICES = [
+  { value: "", label: "Mặc định (Helvetica)" },
+  { value: '"UVN La Xanh", Tahoma, sans-serif', label: "Lá xanh" },
+  { value: '"Open Sans", sans-serif', label: "Open Sans" },
+  { value: "Tahoma, Verdana, sans-serif", label: "Tahoma" },
+  { value: "Arial, sans-serif", label: "Arial" },
+  { value: "Verdana, sans-serif", label: "Verdana" },
+  { value: "Georgia, serif", label: "Georgia" },
+  { value: '"Times New Roman", serif', label: "Times New Roman" },
+];
+let subFontFamily = SUB_FONT;
+export const setSubFontFamily = (choice) => {
+  subFontFamily = choice || SUB_FONT;
+};
 // Màu chữ sub: màu mặc định của app (DEFAULT_ASS_STYLE.primary, vàng) thay cho màu khai báo trong file sub (có sub chọn màu khó nhìn)
 const SUB_COLOR = DEFAULT_ASS_STYLE.primary;
 // true: mọi sub dùng SUB_COLOR; false: dùng màu trong file sub (style và thẻ {\c&H...&})
@@ -37,7 +52,7 @@ const cueFontScale = (lines, sy, resY) => {
 
 const segStyle = (seg, sy, resY, wrap, scale = 1) => ({
   touchAction: "none", // không để trình duyệt tự cuộn / vuốt khi người dùng quẹt ngang trên chữ sub
-  fontFamily: SUB_FONT_FORCE || !seg.font ? SUB_FONT : `"${seg.font}", ${SUB_FONT}`,
+  fontFamily: SUB_FONT_FORCE || !seg.font ? subFontFamily : `"${seg.font}", ${subFontFamily}`,
   // Chặn chữ sub quá to: file sub đặt cỡ chữ lớn thì cũng không vượt SUB_FONT_MAX_RATIO chiều cao hình (resY * sy = chiều cao hình)
   fontSize: Math.min(Math.max((seg.fs || resY / 18) * sy * scale, 8), Math.max(resY * sy * SUB_FONT_MAX_RATIO, 8)) + "px",
   fontWeight: 600, // độ đậm chữ phụ đề (ghi đè cả khi file sub đặt in đậm)

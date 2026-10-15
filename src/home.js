@@ -7,7 +7,7 @@ import ReactPlayer from "react-player";
 import _ from "lodash";
 import Duration from "./Duration";
 import { plainCueText } from "./assText";
-import { buildAssLayer, buildSavedMatcher, highlightSaved, hoverSavedHandlers, wordSelectHandlers, swipeSelectHandlers, recentWordSelect } from "./assLayer";
+import { buildAssLayer, buildSavedMatcher, highlightSaved, hoverSavedHandlers, wordSelectHandlers, swipeSelectHandlers, recentWordSelect, SUB_FONT_CHOICES, setSubFontFamily } from "./assLayer";
 import { getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
 import TranslatePopup from "./translatePopup";
 import { isTV, isTouch } from "./device";
@@ -168,6 +168,19 @@ const Home = (props) => {
   const stacked = isMouse && !fsSide && (view.h > view.w || view.w < 640);
   // Chế độ chỉ nghe tiếng: ẩn hình (video vẫn chạy), khung phụ đề chiếm chỗ của video, bấm vào chữ để tô đen / dịch
   const [audioOnly, setAudioOnly] = useState(false);
+  const [subFont, setSubFont] = useState(() => {
+    try {
+      return localStorage.getItem("subFontChoice") || "";
+    } catch (e) {
+      return "";
+    }
+  });
+  setSubFontFamily(subFont); // áp dụng ngay cho lần vẽ sub kế tiếp
+  useEffect(() => {
+    try {
+      localStorage.setItem("subFontChoice", subFont);
+    } catch (e) {}
+  }, [subFont]);
   const [cuePanelHidden, setCuePanelHidden] = useState(false); // ẩn khung phụ đề bên phải (danh sách câu)
   const layoutStacked = stacked || audioOnly; // chỉ nghe thì luôn xếp dọc: thanh điều khiển gọn ở trên, danh sách sub phía dưới
 
@@ -224,6 +237,7 @@ const Home = (props) => {
   const bodyW = stackW || Math.min(view.w * 0.96, 1800);
   const [audioList, setAudioList] = useState([]);
   const [boxAudio, setBoxAudio] = useState(false);
+  const [boxFont, setBoxFont] = useState(false); // menu chọn font phụ đề
   const [boxSpeed, setBoxSpeed] = useState(false); // menu tốc độ phát
   const [boxDelay, setBoxDelay] = useState(false); // menu chỉnh độ trễ phụ đề
   const [indexDelay, setIndexDelay] = useState(0);
@@ -480,6 +494,15 @@ const Home = (props) => {
     changeAudio((current + 1) % audioList.length);
   };
 
+  const boxFontHandle = () => {
+    if (!boxFont) {
+      setBoxTracks(false);
+      setBoxDelay(false);
+      setBoxSpeed(false);
+      setBoxAudio(false);
+    }
+    setBoxFont(!boxFont);
+  };
   const boxAudioHandle = () => {
     if (_.isEmpty(audioList) && !isMouse) return; // PC/điện thoại: popup còn có nút tắt âm nên vẫn mở
     if (!boxAudio) {
@@ -963,6 +986,8 @@ const Home = (props) => {
   const containerW = sample_video ? sample_video.offsetWidth : videoW;
   const sizeW = audioOnly ? containerW || videoW : videoW; // chỉ nghe: khung video bị thu nhỏ nên lấy độ rộng khung thay vì độ rộng ảnh
   const compactTouch = touch && containerW > 0 && containerW < 700;
+  // Điện thoại màn hình hẹp, chưa xem toàn màn hình: ẩn bớt nút chọn sub / font / tốc độ / audio cho đỡ chật
+  const hideExtraIcons = compactTouch && !isFullSreen;
   const touchButtons = compactTouch ? 7 : 9; // số nút trên thanh điều khiển
   const touchTimeW = compactTouch ? 0 : 110; // chỗ chừa cho chữ thời gian trên thanh điều khiển
   const barPx = touch && containerW
@@ -1906,7 +1931,7 @@ const Home = (props) => {
                             <Duration seconds={state.duration}></Duration>
                           </span>
                         </div>
-                        <div className={`v-subtitle`} id="play_6" onClick={() => boxTrackHandle()}>
+                        <div className={`v-subtitle`} id="play_6" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxTrackHandle()}>
                           <span className="v-subIcon">
                             <svg
                               className="ytp-subtitles-button-icon"
@@ -2012,7 +2037,28 @@ const Home = (props) => {
                             )}
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_speed" onClick={() => boxSpeedHandle()}>
+                        <div className={`v-subtitle`} id="play_font" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxFontHandle()}>
+                          <span className="v-subIcon">
+                            <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
+                              <text x="18" y="24" textAnchor="middle" fontSize="15" fontWeight="600" fill="#fff" fontFamily="Helvetica, Arial, sans-serif">Aa</text>
+                            </svg>
+                          </span>
+                          <div className={`v-subtitlesList ${boxFont ? "v-active" : ""}`}>
+                            <ul>
+                              {SUB_FONT_CHOICES.map((f) => (
+                                <li key={f.label} onClick={() => setSubFont(f.value)}>
+                                  <button className={`v-trackButton ${subFont === f.value ? "v-active" : ""}`} style={{ fontFamily: f.value || "Helvetica, Arial, sans-serif" }}>
+                                    <svg viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M5.6 10.6 1.4 6.4 0 7.8l5.6 5.6 12-12L16.2 0z"></path>
+                                    </svg>
+                                    {f.label}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                        <div className={`v-subtitle`} id="play_speed" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxSpeedHandle()}>
                           <span className="v-subIcon">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <text
@@ -2090,7 +2136,7 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_8" onClick={() => boxAudioHandle()}>
+                        <div className={`v-subtitle`} id="play_8" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxAudioHandle()}>
                           <span className="v-subIcon">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.size(audioList) > 1 || isMouse ? "1" : "0.3"}`}>
                               <path
