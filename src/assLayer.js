@@ -12,6 +12,7 @@ const SUB_FONT_FORCE = true;
 export const SUB_FONT_CHOICES = [
   { value: "", label: "Mặc định (Helvetica)" },
   { value: '"UVN La Xanh", Tahoma, sans-serif', label: "Lá xanh" },
+  { value: '"Varela Round", sans-serif', label: "Varela Round" },
   { value: '"Open Sans", sans-serif', label: "Open Sans" },
   { value: "Tahoma, Verdana, sans-serif", label: "Tahoma" },
   { value: "Arial, sans-serif", label: "Arial" },
@@ -23,6 +24,12 @@ let subFontFamily = SUB_FONT;
 export const setSubFontFamily = (choice) => {
   subFontFamily = choice || SUB_FONT;
 };
+// Font Lá xanh và Open Sans dùng line-height 1.44, các font còn lại dùng 1.2 (để dòng sát nhau mà không che dấu)
+const subLineHeight = () => {
+  if (/UVN La Xanh|Open Sans/.test(subFontFamily)) return SUB_LINE_HEIGHT; // 1.44
+  if (/Arial|Georgia|Times New Roman/.test(subFontFamily)) return 1.16;
+  return 1.26;
+};
 // Màu chữ sub: màu mặc định của app (DEFAULT_ASS_STYLE.primary, vàng) thay cho màu khai báo trong file sub (có sub chọn màu khó nhìn)
 const SUB_COLOR = DEFAULT_ASS_STYLE.primary;
 // true: mọi sub dùng SUB_COLOR; false: dùng màu trong file sub (style và thẻ {\c&H...&})
@@ -31,10 +38,12 @@ const SUB_COLOR_FORCE = true;
 // (font UVN La Xanh: ascent 1.112em + descent 0.251em = 1.363em) cộng padding dọc 2 x 0.04em = 1.443em.
 // Nếu line-height nhỏ hơn số này thì nền đen của dòng dưới đè lên phần đuôi chữ (g, p, y, dấu nặng...) của dòng trên.
 // Đổi font khác thì chỉnh lại số này cho bằng (ascent + descent + 0.08).
-const SUB_LINE_HEIGHT = 1.44;
+const SUB_LINE_HEIGHT = 1.44; // line-height cho font Lá xanh và Open Sans
 
 // Cỡ chữ sub tối đa theo tỉ lệ chiều cao hình video (mặc định khi file sub không đặt cỡ là 1/18 ≈ 0.056). Hạ số này nếu chữ vẫn to, tăng nếu muốn cho phép to hơn.
 const SUB_FONT_MAX_RATIO = 0.07;
+const SUB_VOLUME_CHARS = 130; // số ký tự tối đa của một cue trước khi bắt đầu thu nhỏ chữ (chỉnh nếu thấy vừa / quá nhỏ)
+const SUB_MIN_VOLUME_SCALE = 0.5; // thu nhỏ tối đa còn 50%
 
 // Hệ số thu nhỏ chung cho cả cue: nếu đoạn to nhất vượt trần (SUB_FONT_MAX_RATIO * chiều cao hình)
 // thì thu toàn bộ các đoạn trong cue theo cùng một tỉ lệ, giữ đúng tỉ lệ cỡ chữ giữa các đoạn
@@ -47,7 +56,14 @@ const cueFontScale = (lines, sy, resY) => {
   );
   const capPx = Math.max(resY * sy * SUB_FONT_MAX_RATIO, 8);
   const maxPx = maxFs * sy;
-  return maxPx > capPx ? capPx / maxPx : 1;
+  const base = maxPx > capPx ? capPx / maxPx : 1;
+  // Cue quá nhiều chữ (nhiều dòng) thì thu nhỏ thêm để khối sub không tràn ra ngoài khung hình
+  const chars = lines.reduce(
+    (n, line) => n + line.reduce((m, seg) => m + (seg.text || "").replace(/\s/g, "").length, 0),
+    0
+  );
+  const volume = chars > SUB_VOLUME_CHARS ? Math.max(Math.sqrt(SUB_VOLUME_CHARS / chars), SUB_MIN_VOLUME_SCALE) : 1;
+  return base * volume;
 };
 
 const segStyle = (seg, sy, resY, wrap, scale = 1) => ({
@@ -60,7 +76,7 @@ const segStyle = (seg, sy, resY, wrap, scale = 1) => ({
   textDecoration: [seg.underline && "underline", seg.strike && "line-through"].filter(Boolean).join(" ") || "none",
   color: SUB_COLOR_FORCE && !seg.keepColor ? SUB_COLOR : seg.color,
   background: TEXT_BOX,
-  lineHeight: SUB_LINE_HEIGHT,
+  lineHeight: subLineHeight(),
   padding: "0.04em 0.28em",
   whiteSpace: wrap ? "pre-wrap" : "pre",
   WebkitBoxDecorationBreak: "clone",

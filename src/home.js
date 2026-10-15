@@ -251,8 +251,8 @@ const Home = (props) => {
   const audioTargetRef = useRef(null); // audio đang được chọn (kể cả khi đang tách)
   // Trạng thái popup mới nhất (handler back đọc từ đây, tránh closure cũ)
   const swipeCue = swipeSelectHandlers({ onWord: openTranslate });
-  const popupRef = useRef({ trWord: false, boxTracks: false, boxAudio: false, boxSpeed: false, boxDelay: false });
-  popupRef.current = { trWord: !!trWord, boxTracks, boxAudio, boxSpeed, boxDelay };
+  const popupRef = useRef({ trWord: false, boxTracks: false, boxAudio: false, boxSpeed: false, boxDelay: false, boxFont: false });
+  popupRef.current = { trWord: !!trWord, boxTracks, boxAudio, boxSpeed, boxDelay, boxFont };
 
   if (!_.isEmpty(textTracks) && !_.isEmpty(subtitles)) {
     const subtitle = subtitles.find((s) => s.default);
@@ -269,15 +269,22 @@ const Home = (props) => {
       popupRef.current = { ...open, trWord: false };
     } else if (open.boxDelay) {
       setBoxDelay(false);
+      setBoxFont(false);
       popupRef.current = { ...open, boxDelay: false };
+    } else if (open.boxFont) {
+      setBoxFont(false);
+      popupRef.current = { ...open, boxFont: false };
     } else if (open.boxSpeed) {
       setBoxSpeed(false);
+      setBoxFont(false);
       popupRef.current = { ...open, boxSpeed: false };
     } else if (open.boxAudio) {
       setBoxAudio(false);
+      setBoxFont(false);
       popupRef.current = { ...open, boxAudio: false };
     } else if (open.boxTracks) {
       setBoxTracks(false);
+      setBoxFont(false);
       popupRef.current = { ...open, boxTracks: false };
     } else {
       return false;
@@ -305,9 +312,13 @@ const Home = (props) => {
     setSubDelay(0);
     setStateElm({ played: 0, playing: true });
     setBoxTracks(false);
+    setBoxFont(false);
     setBoxAudio(false);
+    setBoxFont(false);
     setBoxDelay(false);
+    setBoxFont(false);
     setBoxSpeed(false);
+    setBoxFont(false);
     stopExternalAudio();
     setAudioList([]);
     if (type !== "file") {
@@ -497,9 +508,13 @@ const Home = (props) => {
   const boxFontHandle = () => {
     if (!boxFont) {
       setBoxTracks(false);
+      setBoxFont(false);
       setBoxDelay(false);
+      setBoxFont(false);
       setBoxSpeed(false);
+      setBoxFont(false);
       setBoxAudio(false);
+      setBoxFont(false);
     }
     setBoxFont(!boxFont);
   };
@@ -508,8 +523,11 @@ const Home = (props) => {
     if (!boxAudio) {
       setIndexAudio(Math.max(_.findIndex(audioList, (a) => a.enabled), 0));
       setBoxTracks(false);
+      setBoxFont(false);
       setBoxDelay(false);
+      setBoxFont(false);
       setBoxSpeed(false);
+      setBoxFont(false);
     }
     setBoxAudio(!boxAudio);
   };
@@ -775,6 +793,7 @@ const Home = (props) => {
     const target = Math.max(cue.start, 0) + 0.01;
     player.seekTo(target, "seconds");
     setStateElm({ playing: true, ...(state.duration > 0 ? { played: target / state.duration } : {}) }); // tua xong thì phát luôn nếu đang dừng
+    markSeek();
   };
 
   // Lặp lại một phụ đề: hết cue thì tua ngay về đầu cue và phát tiếp
@@ -827,8 +846,11 @@ const Home = (props) => {
     if (!boxDelay) {
       setIndexDelay(0);
       setBoxTracks(false);
+      setBoxFont(false);
       setBoxAudio(false);
+      setBoxFont(false);
       setBoxSpeed(false);
+      setBoxFont(false);
     }
     setBoxDelay(!boxDelay);
   };
@@ -839,8 +861,11 @@ const Home = (props) => {
   const boxSpeedHandle = () => {
     if (!boxSpeed) {
       setBoxTracks(false);
+      setBoxFont(false);
       setBoxAudio(false);
+      setBoxFont(false);
       setBoxDelay(false);
+      setBoxFont(false);
     }
     setBoxSpeed(!boxSpeed);
   };
@@ -1075,6 +1100,7 @@ const Home = (props) => {
   const handleSeekMouseUp = (e) => {
     setStateElm({ seeking: false, played: state.seekingLine, playing: true }); // tua xong thì phát luôn nếu đang dừng
     playerRef.current?.seekTo(parseFloat(state.seekingLine * state.duration), "seconds");
+    markSeek();
   };
 
   const handleChangeSeek = (isNext, seconds) => {
@@ -1082,9 +1108,18 @@ const Home = (props) => {
     newSeconds = newSeconds > 0 ? newSeconds : 0;
     setStateElm({ played: newSeconds / state.duration, playing: true }); // tua xong thì phát luôn nếu đang dừng
     playerRef.current?.seekTo(newSeconds, "seconds");
+    markSeek();
   };
 
-  const handleAutoHide = (event) => {
+  // Sau một lần tua, các sự kiện chuột/chạm ngay sau đó (click, di chuột) không được kéo thời gian ẩn về 3 giây
+  const seekAtRef = useRef(0);
+  const markSeek = () => {
+    seekAtRef.current = Date.now();
+    handleAutoHide(null, 1000);
+  };
+
+  const handleAutoHide = (event, delay = 3000) => {
+    const ms = delay === 3000 && Date.now() - seekAtRef.current < 1500 ? 1000 : delay;
     setHide(false);
     clearTimeout(currentRef.current);
     // Chế độ chuột: luôn tự ẩn sau 3s, không phụ thuộc indexFile (indexFile chỉ dùng cho chế độ remote)
@@ -1093,13 +1128,25 @@ const Home = (props) => {
       currentRef.current = setTimeout(() => {
         setHide(true);
         setBoxTracks(false);
+        setBoxFont(false);
         setBoxAudio(false);
+        setBoxFont(false);
         setBoxDelay(false);
+        setBoxFont(false);
         setBoxSpeed(false);
+        setBoxFont(false);
         if (!isMouse) setIndexFile(0);
-      }, 3000);
+      }, ms);
     }
   };
+
+  // Đang dừng rồi chạy lại (bấm play, tua, phím tắt...): giao diện điều khiển ẩn sau 1 giây
+  const prevPlayingRef = useRef(state.playing);
+  useEffect(() => {
+    const wasPlaying = prevPlayingRef.current;
+    prevPlayingRef.current = state.playing;
+    if (!wasPlaying && state.playing) handleAutoHide(null, 1000);
+  }, [state.playing]);
 
   const getSubtitles = () => {
     fetch(trasksURL + pathViewFile)
@@ -1126,6 +1173,7 @@ const Home = (props) => {
     if (boxDelay) {
       if (!action && indexDelay === 0) {
         setBoxDelay(false);
+        setBoxFont(false);
         setIndexFile(0);
         return;
       }
@@ -1138,6 +1186,7 @@ const Home = (props) => {
     if (boxAudio) {
       if (!action && indexAudio === 0) {
         setBoxAudio(false);
+        setBoxFont(false);
         setIndexFile(0);
         return;
       }
@@ -1159,6 +1208,7 @@ const Home = (props) => {
       // Danh sách điều hướng: Sub 1 (Off + n sub) rồi tới Sub 2 (Off + các sub khác Sub 1), khi có từ 2 sub trở lên
       if (!action && indexSub === 0) {
         setBoxTracks(false);
+        setBoxFont(false);
         setIndexFile(0);
         return;
       }
@@ -1190,8 +1240,11 @@ const Home = (props) => {
     }
     if (!_.isEmpty(subtitles)) {
       setBoxAudio(false);
+      setBoxFont(false);
       setBoxDelay(false);
+      setBoxFont(false);
       setBoxSpeed(false);
+      setBoxFont(false);
       setBoxTracks(!boxTracks);
     }
   };
@@ -1208,7 +1261,7 @@ const Home = (props) => {
     const target = Math.min(Math.max(current + delta, 0), max);
     player.seekTo(target, "seconds");
     setStateElm({ playing: true, ...(state.duration > 0 ? { played: target / state.duration } : {}) }); // tua xong thì phát luôn nếu đang dừng
-    handleAutoHide();
+    markSeek();
   };
 
   const togglePlay = () => {
