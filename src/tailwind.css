@@ -1,10 +1,17 @@
 /* Tailwind CSS v4. Không import preflight để giữ nguyên reset/style hiện có trong App.css */
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities);
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css";
 
 /* Bố cục điện thoại / màn hình hẹp hoặc thấp (điện thoại nằm ngang): dùng compact:... */
 @custom-variant compact {
   @media (max-width: 900px), (max-height: 520px) {
+    @slot;
+  }
+}
+
+/* Thiết bị cảm ứng (con trỏ thô): dùng coarse:... */
+@custom-variant coarse {
+  @media (pointer: coarse) {
     @slot;
   }
 }

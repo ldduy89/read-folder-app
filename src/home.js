@@ -2032,7 +2032,7 @@ const Home = (props) => {
                           <div className={`v-subtitlesList ${boxTracks ? "v-active" : ""}`}>
                             <div style={{ display: "flex", alignItems: "flex-start" }}>
                             <ul className="v-subCol">
-                              <li className="v-subHead"><svg className="v-ccIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <li className="flex items-center gap-[0.6em] !px-[0.3em] !pt-[0.2em] !pb-[0.6em] !text-[1em] !font-medium whitespace-nowrap pointer-events-none text-[#46557a]"><svg className="v-ccIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <rect x="2.5" y="5" width="19" height="14" rx="3" />
                                   <path d="M10.6 10.2a2.2 2.2 0 1 0 0 3.6" />
                                   <path d="M17.6 10.2a2.2 2.2 0 1 0 0 3.6" />
@@ -2064,7 +2064,7 @@ const Home = (props) => {
                             </ul>
                             {subtitles && subtitles.length > 1 && (
                               <ul className="v-subCol">
-                                <li className="v-subHead"><svg className="v-ccIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <li className="flex items-center gap-[0.6em] !px-[0.3em] !pt-[0.2em] !pb-[0.6em] !text-[1em] !font-medium whitespace-nowrap pointer-events-none text-[#46557a]"><svg className="v-ccIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <rect x="2.5" y="5" width="19" height="14" rx="3" />
                                   <path d="M10.6 10.2a2.2 2.2 0 1 0 0 3.6" />
                                   <path d="M17.6 10.2a2.2 2.2 0 1 0 0 3.6" />
@@ -2094,20 +2094,20 @@ const Home = (props) => {
                             </div>
                             {/* Chỉnh độ trễ phụ đề: lùi / tới / reset (PC + điện thoại; TV dùng nút đồng hồ riêng) */}
                             {isMouse && (
-                              <div className="v-delayBar" onClick={(e) => e.stopPropagation()}>
-                                <button type="button" className="v-delayBtn" title="Phụ đề hiện sớm hơn 0.1s (phím G)" onClick={() => changeSubDelay(-SUB_DELAY_STEP)}>
+                              <div className="flex gap-[0.4em] !mt-[0.3em] !pt-[0.8em] !pb-0 !px-0 !border-t !border-solid !border-[#e6e8ec]" onClick={(e) => e.stopPropagation()}>
+                                <button type="button" className="flex-1 inline-flex items-center gap-[0.45em] appearance-none py-[0.5em] px-[0.8em] bg-[#f0f1f4] border-none rounded-full text-[#1b2233] cursor-pointer [font-family:inherit] text-[0.95em] font-medium whitespace-nowrap [transition:background-color_.2s_ease,transform_.1s_ease] hover:bg-[#e4e6ec] active:scale-[0.97] coarse:min-h-[44px] [&_svg]:w-[1.2em] [&_svg]:h-[1.2em] [&_svg]:flex-none [&_svg]:text-[#2b4a7e] justify-center" title="Phụ đề hiện sớm hơn 0.1s (phím G)" onClick={() => changeSubDelay(-SUB_DELAY_STEP)}>
                                   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                     <path d="M16 5.5v13a1 1 0 0 1-1.55.83l-9.6-6.5a1 1 0 0 1 0-1.66l9.6-6.5A1 1 0 0 1 16 5.5z" />
                                   </svg>
                                   −0.1s
                                 </button>
-                                <button type="button" className="v-delayBtn" title="Phụ đề hiện trễ hơn 0.1s (phím H)" onClick={() => changeSubDelay(SUB_DELAY_STEP)}>
+                                <button type="button" className="flex-1 inline-flex items-center gap-[0.45em] appearance-none py-[0.5em] px-[0.8em] bg-[#f0f1f4] border-none rounded-full text-[#1b2233] cursor-pointer [font-family:inherit] text-[0.95em] font-medium whitespace-nowrap [transition:background-color_.2s_ease,transform_.1s_ease] hover:bg-[#e4e6ec] active:scale-[0.97] coarse:min-h-[44px] [&_svg]:w-[1.2em] [&_svg]:h-[1.2em] [&_svg]:flex-none [&_svg]:text-[#2b4a7e] justify-center" title="Phụ đề hiện trễ hơn 0.1s (phím H)" onClick={() => changeSubDelay(SUB_DELAY_STEP)}>
                                   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                     <path d="M8 5.5v13a1 1 0 0 0 1.55.83l9.6-6.5a1 1 0 0 0 0-1.66l-9.6-6.5A1 1 0 0 0 8 5.5z" />
                                   </svg>
                                   +0.1s
                                 </button>
-                                <button type="button" className="v-delayBtn" title="Đặt lại độ trễ" onClick={() => changeSubDelay(null)}>
+                                <button type="button" className="flex-1 inline-flex items-center gap-[0.45em] appearance-none py-[0.5em] px-[0.8em] bg-[#f0f1f4] border-none rounded-full text-[#1b2233] cursor-pointer [font-family:inherit] text-[0.95em] font-medium whitespace-nowrap [transition:background-color_.2s_ease,transform_.1s_ease] hover:bg-[#e4e6ec] active:scale-[0.97] coarse:min-h-[44px] [&_svg]:w-[1.2em] [&_svg]:h-[1.2em] [&_svg]:flex-none [&_svg]:text-[#2b4a7e] justify-center" title="Đặt lại độ trễ" onClick={() => changeSubDelay(null)}>
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <path d="M20 12a8 8 0 1 1-2.6-5.9" />
                                     <path d="M20 4v5h-5" />
@@ -2241,10 +2241,10 @@ const Home = (props) => {
                               ))}
                             </ul>
                             {isMouse && (
-                              <div className="v-delayBar v-muteBar" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex gap-[0.4em] !mt-[0.3em] !pt-[0.8em] !pb-0 !px-0 !border-t !border-solid !border-[#e6e8ec] v-muteBar" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   type="button"
-                                  className={`v-delayBtn v-muteBtn ${state.muted ? "on" : ""}`}
+                                  className={`flex-1 inline-flex items-center gap-[0.45em] appearance-none py-[0.5em] px-[0.8em] bg-[#f0f1f4] border-none rounded-full text-[#1b2233] cursor-pointer [font-family:inherit] text-[0.95em] font-medium whitespace-nowrap [transition:background-color_.2s_ease,transform_.1s_ease] hover:bg-[#e4e6ec] active:scale-[0.97] coarse:min-h-[44px] [&_svg]:w-[1.2em] [&_svg]:h-[1.2em] [&_svg]:flex-none [&_svg]:text-[#2b4a7e] justify-start !pl-[1em] ${state.muted ? "!bg-[#e6eeff] !text-[#0f1a33] !font-semibold [&_svg]:!text-[#1f5eff]" : ""}`}
                                   title="Bật / tắt âm (phím M)"
                                   aria-pressed={state.muted}
                                   onClick={() => {
