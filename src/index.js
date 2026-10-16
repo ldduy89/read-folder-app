@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './tailwind.generated.css'; // output của Tailwind v4 (xem script css/prestart trong package.json)
 import './index.css';
 import App from './App';
 

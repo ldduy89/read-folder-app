@@ -1,0 +1,3 @@
+/* Tailwind CSS v4. Không import preflight để giữ nguyên reset/style hiện có trong App.css */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
