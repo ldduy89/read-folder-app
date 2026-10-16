@@ -40,7 +40,7 @@ const SUB_COLOR_FORCE = true;
 const SUB_LINE_HEIGHT = 1.44; // line-height cho font Lá xanh và Open Sans
 
 // Cỡ chữ sub tối đa theo tỉ lệ chiều cao hình video (mặc định khi file sub không đặt cỡ là 1/18 ≈ 0.056). Hạ số này nếu chữ vẫn to, tăng nếu muốn cho phép to hơn.
-const SUB_FONT_MAX_RATIO = 0.07;
+const SUB_FONT_MAX_RATIO = 1 / 18; // trần = đúng cỡ mặc định khi sub không đặt size (resY / 18)
 const SUB_VOLUME_CHARS = 130; // số ký tự tối đa của một cue trước khi bắt đầu thu nhỏ chữ (chỉnh nếu thấy vừa / quá nhỏ)
 const SUB_MIN_VOLUME_SCALE = 0.5; // thu nhỏ tối đa còn 50%
 
