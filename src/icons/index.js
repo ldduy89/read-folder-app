@@ -1,0 +1,26 @@
+// Tất cả icon SVG của app. Mỗi file .svg được import thành React component (CRA hỗ trợ sẵn qua SVGR).
+export { ReactComponent as ArrowBackIcon } from "./arrow-back.svg";
+export { ReactComponent as CameraIcon } from "./camera.svg";
+export { ReactComponent as HeadphoneIcon } from "./headphone.svg";
+export { ReactComponent as HeadphoneWhiteIcon } from "./headphone-white.svg";
+export { ReactComponent as PanelIcon } from "./panel.svg";
+export { ReactComponent as PanelHiddenIcon } from "./panel-hidden.svg";
+export { ReactComponent as PlayCircleIcon } from "./play-circle.svg";
+export { ReactComponent as SkipPreviousIcon } from "./skip-previous.svg";
+export { ReactComponent as SkipNextIcon } from "./skip-next.svg";
+export { ReactComponent as RewindIcon } from "./rewind.svg";
+export { ReactComponent as FastForwardIcon } from "./fast-forward.svg";
+export { ReactComponent as PlayIcon } from "./play.svg";
+export { ReactComponent as PauseIcon } from "./pause.svg";
+export { ReactComponent as SubtitlesIcon } from "./subtitles.svg";
+export { ReactComponent as CcIcon } from "./cc.svg";
+export { ReactComponent as CheckIcon } from "./check.svg";
+export { ReactComponent as TriangleLeftIcon } from "./triangle-left.svg";
+export { ReactComponent as TriangleRightIcon } from "./triangle-right.svg";
+export { ReactComponent as RepeatIcon } from "./repeat.svg";
+export { ReactComponent as FontAaIcon } from "./font-aa.svg";
+export { ReactComponent as ClockIcon } from "./clock.svg";
+export { ReactComponent as VolumeOffIcon } from "./volume-off.svg";
+export { ReactComponent as VolumeUpIcon } from "./volume-up.svg";
+export { ReactComponent as FullscreenIcon } from "./fullscreen.svg";
+export { ReactComponent as FullscreenExitIcon } from "./fullscreen-exit.svg";
