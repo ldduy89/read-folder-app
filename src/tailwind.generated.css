@@ -869,11 +869,6 @@
 .\[\&\.v-action\]\:pr-\[1\.1em\].v-action {
   padding-right: 1.1em;
 }
-@media (pointer: coarse) {
-  .\[\&\.v-action\]\:coarse\:\!pr-\[16px\].v-action {
-    padding-right: 16px !important;
-  }
-}
 .\[\&\.v-active\]\:\!bg-\[\#e6eeff\].v-active {
   background-color: #e6eeff !important;
 }

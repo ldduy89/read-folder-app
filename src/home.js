@@ -20,12 +20,14 @@ import {
 } from "./assLayer";
 import { getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
 import TranslatePopup from "./translatePopup";
+import BarButton from "./components/BarButton";
+import MenuPanel from "./components/MenuPanel";
+import TrackButton from "./components/TrackButton";
 import { isTV, isTouch } from "./device";
 import {
   ArrowBackIcon,
   CameraIcon,
   CcIcon,
-  CheckIcon,
   ClockIcon,
   FastForwardIcon,
   FontAaIcon,
@@ -2126,18 +2128,14 @@ const Home = (props) => {
                             <Duration seconds={state.duration}></Duration>
                           </span>
                         </div>
-                        <div
-                          className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`}
+                        <BarButton
+                          name="v-subtitle"
                           id="play_6"
                           style={hideExtraIcons ? { display: "none" } : undefined}
                           onClick={() => boxTrackHandle()}
+                          icon={<SubtitlesIcon height="100%" width="100%" fillOpacity={`${_.isEmpty(subtitles) ? "0.3" : "1"}`} />}
                         >
-                          <span className="v-subIcon w-full h-full">
-                            <SubtitlesIcon height="100%" width="100%" fillOpacity={`${_.isEmpty(subtitles) ? "0.3" : "1"}`} />
-                          </span>
-                          <div
-                            className={`v-subtitlesList box-border !p-[0.8em_0.8em_0.7em] bg-[rgba(250,250,252,0.98)] text-[#1b2233] !border !border-solid !border-[rgba(0,0,0,0.06)] rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-auto max-w-[calc(100vw-20px)] max-h-[var(--menu-max-h,70vh)] absolute bottom-[calc(var(--width-bar)+var(--bar-gap,0px))] left-1/2 z-30 [transform:translateX(-50%)] [transition:opacity_0.25s_ease,visibility_0.25s_ease] ${boxTracks ? "v-active opacity-100 visible" : "opacity-0 invisible"}`}
-                          >
+                          <MenuPanel open={boxTracks}>
                             <div style={{ display: "flex", alignItems: "flex-start" }}>
                               <ul className="v-subCol !px-[0.45em] !py-0 [&:first-child]:!pl-0 [&:last-child]:!pr-0 [&+&]:!ml-[0.45em] [&+&]:!pl-[0.9em] [&+&]:!border-l [&+&]:!border-solid [&+&]:!border-[#e6e8ec]">
                                 <li className="flex items-center gap-[0.6em] !px-[0.3em] !pt-[0.2em] !pb-[0.6em] !text-[1em] !font-medium whitespace-nowrap pointer-events-none text-[#46557a]">
@@ -2145,25 +2143,17 @@ const Home = (props) => {
                                   Sub 1
                                 </li>
                                 <li id={`sub_0`} onClick={() => changeSubtitle(null)}>
-                                  <button
-                                    className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${!subtitles || !subtitles.find((s) => !!s.default) ? "v-active" : ""}`}
-                                    data-language="off"
-                                  >
-                                    <CheckIcon />
+                                  <TrackButton data-language="off" active={!subtitles || !subtitles.find((s) => !!s.default)}>
                                     Off
-                                  </button>
+                                  </TrackButton>
                                 </li>
                                 {subtitles &&
                                   subtitles.map((sub, index) => {
                                     return (
                                       <li id={`sub_${index + 1}`} onClick={() => changeSubtitle(sub.language)} key={index}>
-                                        <button
-                                          className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${sub.default ? "v-active" : ""}`}
-                                          data-language="off"
-                                        >
-                                          <CheckIcon />
+                                        <TrackButton data-language="off" active={!!sub.default}>
                                           {sub.lable}
-                                        </button>
+                                        </TrackButton>
                                       </li>
                                     );
                                   })}
@@ -2175,25 +2165,17 @@ const Home = (props) => {
                                     Sub 2
                                   </li>
                                   <li id="sub2_0" onClick={() => chooseSecondSub(null)}>
-                                    <button
-                                      className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${!secLang ? "v-active" : ""}`}
-                                      data-language="off"
-                                    >
-                                      <CheckIcon />
+                                    <TrackButton data-language="off" active={!secLang}>
                                       Off
-                                    </button>
+                                    </TrackButton>
                                   </li>
                                   {subtitles
                                     .filter((sub) => sub.language !== activeSubLang)
                                     .map((sub, index) => (
                                       <li id={`sub2_${index + 1}`} onClick={() => chooseSecondSub(sub.language)} key={`s2_${index}`}>
-                                        <button
-                                          className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${secLang === sub.language ? "v-active" : ""}`}
-                                          data-language="off"
-                                        >
-                                          <CheckIcon />
+                                        <TrackButton data-language="off" active={secLang === sub.language}>
                                           {sub.lable}
-                                        </button>
+                                        </TrackButton>
                                       </li>
                                     ))}
                                 </ul>
@@ -2234,42 +2216,36 @@ const Home = (props) => {
                                 </button>
                               </div>
                             )}
-                          </div>
-                        </div>
-                        <div
-                          className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`}
+                          </MenuPanel>
+                        </BarButton>
+                        <BarButton
+                          name="v-subtitle"
                           id="play_7"
                           style={hideExtraIcons ? { display: "none" } : undefined}
                           onClick={() => boxFontHandle()}
+                          icon={<FontAaIcon height="100%" width="100%" />}
                         >
-                          <span className="v-subIcon w-full h-full">
-                            <FontAaIcon height="100%" width="100%" />
-                          </span>
-                          <div
-                            className={`v-subtitlesList box-border !p-[0.8em_0.8em_0.7em] bg-[rgba(250,250,252,0.98)] text-[#1b2233] !border !border-solid !border-[rgba(0,0,0,0.06)] rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-auto max-w-[calc(100vw-20px)] max-h-[var(--menu-max-h,70vh)] absolute bottom-[calc(var(--width-bar)+var(--bar-gap,0px))] left-1/2 z-30 [transform:translateX(-50%)] [transition:opacity_0.25s_ease,visibility_0.25s_ease] ${boxFont ? "v-active opacity-100 visible" : "opacity-0 invisible"}`}
-                          >
+                          <MenuPanel open={boxFont}>
                             <ul>
                               {SUB_FONT_CHOICES.map((f, fi) => (
                                 <li key={f.label} className={indexFont === fi ? "fo-active" : ""} onClick={() => setSubFont(f.value)}>
-                                  <button
-                                    className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${subFont === f.value ? "v-active" : ""}`}
+                                  <TrackButton
+                                    active={subFont === f.value}
                                     style={{ fontFamily: f.value || '"Varela Round", Helvetica, Arial, sans-serif' }}
                                   >
-                                    <CheckIcon />
                                     {f.label}
-                                  </button>
+                                  </TrackButton>
                                 </li>
                               ))}
                             </ul>
-                          </div>
-                        </div>
-                        <div
-                          className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`}
+                          </MenuPanel>
+                        </BarButton>
+                        <BarButton
+                          name="v-subtitle"
                           id="play_8"
                           style={hideExtraIcons ? { display: "none" } : undefined}
                           onClick={() => boxSpeedHandle()}
-                        >
-                          <span className="v-subIcon w-full h-full">
+                          icon={
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <text
                                 x="18"
@@ -2283,10 +2259,9 @@ const Home = (props) => {
                                 {formatSpeed(state.playbackRate)}
                               </text>
                             </svg>
-                          </span>
-                          <div
-                            className={`v-subtitlesList box-border !p-[0.8em_0.8em_0.7em] bg-[rgba(250,250,252,0.98)] text-[#1b2233] !border !border-solid !border-[rgba(0,0,0,0.06)] rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-auto max-w-[calc(100vw-20px)] max-h-[var(--menu-max-h,70vh)] absolute bottom-[calc(var(--width-bar)+var(--bar-gap,0px))] left-1/2 z-30 [transform:translateX(-50%)] [transition:opacity_0.25s_ease,visibility_0.25s_ease] ${boxSpeed ? "v-active opacity-100 visible" : "opacity-0 invisible"}`}
-                          >
+                          }
+                        >
+                          <MenuPanel open={boxSpeed}>
                             <ul>
                               {SPEED_OPTIONS.map((r, si) => (
                                 <li
@@ -2297,29 +2272,22 @@ const Home = (props) => {
                                     changeSpeed({ set: r });
                                   }}
                                 >
-                                  <button
-                                    className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${state.playbackRate === r ? "v-active" : ""}`}
-                                  >
-                                    <CheckIcon />
+                                  <TrackButton active={state.playbackRate === r}>
                                     {r === 1 ? "Bình thường (1x)" : formatSpeed(r)}
-                                  </button>
+                                  </TrackButton>
                                 </li>
                               ))}
                             </ul>
-                          </div>
-                        </div>
-                        <div
-                          className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`}
+                          </MenuPanel>
+                        </BarButton>
+                        <BarButton
+                          name="v-subtitle"
                           id="play_9"
                           style={isMouse ? { display: "none" } : undefined}
                           onClick={() => boxDelayHandle()}
+                          icon={<ClockIcon height="100%" width="100%" fillOpacity={`${_.isEmpty(subtitles) ? "0.3" : "1"}`} />}
                         >
-                          <span className="v-subIcon w-full h-full">
-                            <ClockIcon height="100%" width="100%" fillOpacity={`${_.isEmpty(subtitles) ? "0.3" : "1"}`} />
-                          </span>
-                          <div
-                            className={`v-subtitlesList box-border !p-[0.8em_0.8em_0.7em] bg-[rgba(250,250,252,0.98)] text-[#1b2233] !border !border-solid !border-[rgba(0,0,0,0.06)] rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-auto max-w-[calc(100vw-20px)] max-h-[var(--menu-max-h,70vh)] absolute bottom-[calc(var(--width-bar)+var(--bar-gap,0px))] left-1/2 z-30 [transform:translateX(-50%)] [transition:opacity_0.25s_ease,visibility_0.25s_ease] ${boxDelay ? "v-active opacity-100 visible" : "opacity-0 invisible"}`}
-                          >
+                          <MenuPanel open={boxDelay}>
                             <ul>
                               <li
                                 id="del_0"
@@ -2328,11 +2296,7 @@ const Home = (props) => {
                                   changeSubDelay(SUB_DELAY_STEP);
                                 }}
                               >
-                                <button
-                                  className={`v-trackButton v-action block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px]`}
-                                >
-                                  Trễ hơn (+0.1s)
-                                </button>
+                                <TrackButton action>Trễ hơn (+0.1s)</TrackButton>
                               </li>
                               <li
                                 id="del_1"
@@ -2341,11 +2305,7 @@ const Home = (props) => {
                                   changeSubDelay(-SUB_DELAY_STEP);
                                 }}
                               >
-                                <button
-                                  className={`v-trackButton v-action block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px]`}
-                                >
-                                  Sớm hơn (-0.1s)
-                                </button>
+                                <TrackButton action>Sớm hơn (-0.1s)</TrackButton>
                               </li>
                               <li
                                 id="del_2"
@@ -2354,36 +2314,25 @@ const Home = (props) => {
                                   changeSubDelay(null);
                                 }}
                               >
-                                <button
-                                  className={`v-trackButton v-action block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px]`}
-                                >
-                                  Đặt lại độ trễ ({formatDelay(subDelay)})
-                                </button>
+                                <TrackButton action>Đặt lại độ trễ ({formatDelay(subDelay)})</TrackButton>
                               </li>
                             </ul>
-                          </div>
-                        </div>
-                        <div
-                          className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`}
+                          </MenuPanel>
+                        </BarButton>
+                        <BarButton
+                          name="v-subtitle"
                           id="play_10"
                           style={hideExtraIcons ? { display: "none" } : undefined}
                           onClick={() => boxAudioHandle()}
-                        >
-                          <span className="v-subIcon w-full h-full">
+                          icon={
                             <HeadphoneWhiteIcon height="100%" width="100%" fillOpacity={`${_.size(audioList) > 1 || isMouse ? "1" : "0.3"}`} />
-                          </span>
-                          <div
-                            className={`v-subtitlesList box-border !p-[0.8em_0.8em_0.7em] bg-[rgba(250,250,252,0.98)] text-[#1b2233] !border !border-solid !border-[rgba(0,0,0,0.06)] rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-auto max-w-[calc(100vw-20px)] max-h-[var(--menu-max-h,70vh)] absolute bottom-[calc(var(--width-bar)+var(--bar-gap,0px))] left-1/2 z-30 [transform:translateX(-50%)] [transition:opacity_0.25s_ease,visibility_0.25s_ease] !left-auto !right-0 ![transform:none] v-popRight ${boxAudio ? "v-active opacity-100 visible" : "opacity-0 invisible"}`}
-                          >
+                          }
+                        >
+                          <MenuPanel open={boxAudio} extra="!left-auto !right-0 ![transform:none] v-popRight">
                             <ul>
                               {audioList.map((audio, index) => (
                                 <li id={`aud_${index}`} onClick={() => changeAudio(index)} key={index}>
-                                  <button
-                                    className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${audio.enabled ? "v-active" : ""}`}
-                                  >
-                                    <CheckIcon />
-                                    {audio.label}
-                                  </button>
+                                  <TrackButton active={audio.enabled}>{audio.label}</TrackButton>
                                 </li>
                               ))}
                             </ul>
@@ -2402,42 +2351,46 @@ const Home = (props) => {
                                     handleAutoHide();
                                   }}
                                 >
-                                  {state.muted ? (
-                                    <VolumeOffIcon />
-                                  ) : (
-                                    <VolumeUpIcon />
-                                  )}
+                                  {state.muted ? <VolumeOffIcon /> : <VolumeUpIcon />}
                                   {state.muted ? "Đang tắt âm - bấm để bật" : "Tắt âm"}
                                 </button>
                               </div>
                             )}
-                          </div>
-                        </div>
-                        <div
-                          className={`v-volume relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_svg]:fill-white [&_svg]:opacity-[.85] [&_svg]:h-full [&_svg]:w-full [&_svg]:[transition:opacity_.25s] ${state.muted ? "v-muted" : ""}`}
+                          </MenuPanel>
+                        </BarButton>
+                        <BarButton
+                          name="v-volume"
                           id="play_11"
                           style={isMouse ? { display: "none" } : undefined}
                           onClick={() => setStateElm({ muted: !state.muted })}
-                        >
-                          <span className="v-playerIcon v-iconVolumeHigh">
-                            <VolumeUpIcon height="100%" width="100%" />
-                          </span>
-                          <span className="v-playerIcon v-iconVolumeMute">
-                            <VolumeOffIcon height="100%" width="100%" />
-                          </span>
-                        </div>
-                        <div
-                          className={`v-fullscreen relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_svg]:fill-white [&_svg]:opacity-[.85] [&_svg]:h-full [&_svg]:w-full [&_svg]:[transition:opacity_.25s] ${isFullSreen ? "v-exit" : ""}`}
+                          extra={state.muted ? "v-muted" : ""}
+                          icon={
+                            <>
+                              <span className="v-playerIcon v-iconVolumeHigh">
+                                <VolumeUpIcon height="100%" width="100%" />
+                              </span>
+                              <span className="v-playerIcon v-iconVolumeMute">
+                                <VolumeOffIcon height="100%" width="100%" />
+                              </span>
+                            </>
+                          }
+                        />
+                        <BarButton
+                          name="v-fullscreen"
                           id="play_12"
                           onClick={() => handleFullSreen(!isFullSreen)}
-                        >
-                          <span className="v-playerIcon v-iconFullscreen">
-                            <FullscreenIcon height="100%" width="100%" />
-                          </span>
-                          <span className="v-playerIcon v-iconShrink">
-                            <FullscreenExitIcon height="100%" width="100%" />
-                          </span>
-                        </div>
+                          extra={isFullSreen ? "v-exit" : ""}
+                          icon={
+                            <>
+                              <span className="v-playerIcon v-iconFullscreen">
+                                <FullscreenIcon height="100%" width="100%" />
+                              </span>
+                              <span className="v-playerIcon v-iconShrink">
+                                <FullscreenExitIcon height="100%" width="100%" />
+                              </span>
+                            </>
+                          }
+                        />
                       </div>
                     </div>
                   </div>
