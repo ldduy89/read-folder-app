@@ -1584,7 +1584,7 @@ const Home = (props) => {
           }
         }}
       >
-        <header className="App-header">
+        <header className="flex min-h-screen flex-col items-center justify-center bg-[#282c34] text-[calc(10px_+_2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:justify-start max-[800px]:overflow-x-clip">
           <div className="App-body" id="body" style={isMouse && type === "file" ? { width: "96vw", maxWidth: "1800px", height: "auto", overflow: "visible" } : undefined}>
             {/* Hàng đầu trang: nút quay lại (icon) + đường dẫn mục. Trang xem file không hiện tên file. */}
             <div className="App-pathbar">
@@ -1676,8 +1676,8 @@ const Home = (props) => {
               folders.map((folder, index) => {
                 const fullPath = _.filter([root, pathName, folder.name], (elm) => !!elm).join("/");
                 return (
-                  <div className={`App-item ${indexFile === index ? "f-active" : ""}`} id={`file_${index}`} key={index}>
-                    <img src={folder.type === "file" ? fileIcon : folderIcon} alt="icon" />
+                  <div className={`App-item py-[5px] max-[800px]:flex max-[800px]:items-start max-[800px]:py-[9px] ${indexFile === index ? "f-active" : ""}`} id={`file_${index}`} key={index}>
+                    <img className="max-[800px]:w-[18px] max-[800px]:flex-none max-[800px]:mt-[3px]" src={folder.type === "file" ? fileIcon : folderIcon} alt="icon" />
                     <Link to={`/${fullPath}${folder.type === "file" ? "?type=file" : ""}`}>{folder.name}</Link>
                     {/* Home: ổ đĩa không có nút, thư mục đã pick có nút "Bỏ pick". Trong thư mục: thư mục con có nút Pick. TV (remote) không hiện nút. */}
                     {isMouse && folder.type === "folder" && (root !== "" || folder.picked) && (

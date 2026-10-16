@@ -2,6 +2,7 @@
 @layer properties;
 @layer theme {
   :root, :host {
+    --color-white: #fff;
     --spacing: 0.25rem;
     --font-weight-semibold: 600;
     --leading-normal: 1.5;
@@ -68,6 +69,9 @@
   .min-h-\[160px\] {
     min-height: 160px;
   }
+  .min-h-screen {
+    min-height: 100vh;
+  }
   .w-\[90px\] {
     width: 90px;
   }
@@ -89,11 +93,17 @@
   .resize-y {
     resize: vertical;
   }
+  .flex-col {
+    flex-direction: column;
+  }
   .flex-wrap {
     flex-wrap: wrap;
   }
   .items-center {
     align-items: center;
+  }
+  .justify-center {
+    justify-content: center;
   }
   .gap-2 {
     gap: calc(var(--spacing) * 2);
@@ -111,6 +121,9 @@
   .border-\[var\(--line\)\] {
     border-color: var(--line);
   }
+  .bg-\[\#282c34\] {
+    background-color: #282c34;
+  }
   .bg-\[var\(--bg\)\] {
     background-color: var(--bg);
   }
@@ -122,6 +135,9 @@
   }
   .px-4 {
     padding-inline: calc(var(--spacing) * 4);
+  }
+  .py-\[5px\] {
+    padding-block: 5px;
   }
   .pt-3 {
     padding-top: calc(var(--spacing) * 3);
@@ -149,6 +165,9 @@
   }
   .text-\[18px\] {
     font-size: 18px;
+  }
+  .text-\[calc\(10px_\+_2vmin\)\] {
+    font-size: calc(10px + 2vmin);
   }
   .leading-\[1\.6\] {
     --tw-leading: 1.6;
@@ -180,6 +199,9 @@
   .text-\[var\(--muted\)\] {
     color: var(--muted);
   }
+  .text-white {
+    color: var(--color-white);
+  }
   .italic {
     font-style: italic;
   }
@@ -201,6 +223,35 @@
   .select-none {
     -webkit-user-select: none;
     user-select: none;
+  }
+  @media (width < 800px) {
+    .max-\[800px\]\:mt-\[3px\] {
+      margin-top: 3px;
+    }
+    .max-\[800px\]\:flex {
+      display: flex;
+    }
+    .max-\[800px\]\:min-h-dvh {
+      min-height: 100dvh;
+    }
+    .max-\[800px\]\:w-\[18px\] {
+      width: 18px;
+    }
+    .max-\[800px\]\:flex-none {
+      flex: none;
+    }
+    .max-\[800px\]\:items-start {
+      align-items: flex-start;
+    }
+    .max-\[800px\]\:justify-start {
+      justify-content: flex-start;
+    }
+    .max-\[800px\]\:overflow-x-clip {
+      overflow-x: clip;
+    }
+    .max-\[800px\]\:py-\[9px\] {
+      padding-block: 9px;
+    }
   }
 }
 @property --tw-rotate-x {

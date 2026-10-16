@@ -29,10 +29,6 @@
   width: 50%
  }
  
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
 a {
   color: aliceblue;
 }
@@ -51,32 +47,13 @@ img {
   padding-left: 10px;
   margin-bottom: -3px;
 }
-.App-item {
-  padding: 5px 0px;
-}
 .active a{
   color: #61dafb;
-}
-.app-title{
-  padding-bottom: 5px;
 }
 .player-wrapper {
   position: relative;
   /* padding-top: 36.25% */
   height: 400px;
-}
-.button-vol {
-  font-size: 20px;
-  padding: 5px 5px;
-  margin: 5px;
-  width: 70px;
-}
-
-.button-next-video {
-  font-size: 20px;
-  padding: 5px 5px;
-  margin: 5px;
-  width: 120px;
 }
 
 .react-player {
@@ -89,41 +66,8 @@ img {
   height: 100% !important;
   width: 100% !important;
 }
-.App-list {
-  padding: 10px;
-  max-height: 600px;
-  overflow-x: auto;
-}
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
 .v-vlite {
   font-family: Roboto,arial,sans-serif;
   /* position: relative;
@@ -603,12 +547,6 @@ img {
   overflow-wrap: anywhere; /* tên file rất dài không tràn ra ngoài nền tối */
 }
 @media (max-width: 800px) {
-  .App-header {
-    min-height: 100vh;
-    min-height: 100dvh;
-    justify-content: flex-start; /* bắt đầu từ trên, không canh giữa theo chiều dọc */
-    overflow-x: clip; /* không dùng hidden: nó biến header thành khung cuộn và làm hỏng sticky */
-  }
   /* Danh sách thư mục/file (trang video có style riêng nên không bị ảnh hưởng) */
   .App-body {
     width: 100%;
@@ -616,16 +554,6 @@ img {
     overflow: visible;
     padding: 12px 12px 32px;
     font-size: 16px;
-  }
-  .App-item {
-    padding: 9px 0; /* dòng cao hơn cho dễ chạm */
-    display: flex;
-    align-items: flex-start;
-  }
-  .App-item img {
-    flex: none;
-    width: 18px;
-    margin-top: 3px;
   }
 }
 
