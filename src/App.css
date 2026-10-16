@@ -108,40 +108,6 @@ img {
   transition: .25s ease-in;
   z-index: 30; /* thanh điều khiển và popup nằm trên sub */
 }
-.v-vlite .v-topBar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: auto;
-  min-height: calc(var(--font-size-title, 24px) * 1.5);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: calc(var(--font-size-title, 24px) * 0.5);
-  padding-top: 5px;
-  text-align: right;
-  padding-left: 15px;
-  padding-right: 10px;
-  background: linear-gradient(180deg,#000,hsla(0,0%,100%,0));
-  transition: .25s ease-in;
-  text-align: left;
-}
-.v-vlite .v-topBar span {
-  font-size: var(--font-size-title, 24px); /* co giãn theo độ rộng khung video */
-}
-.v-vlite .v-topBar .v-topTitle {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis; /* tên dài thì cắt bằng ... thay vì xuống nhiều dòng */
-}
-.v-vlite .v-topBar .v-topTime {
-  flex-shrink: 0;
-  white-space: nowrap;
-  font-size: calc(var(--font-size-title, 24px) * 0.85);
-}
 .v-vlite .v-progressBar {
   position: absolute;
   top: 0;
@@ -238,41 +204,10 @@ img {
   transform: translateX(-50%) translateY(-50%); */
 }
 
-.v-vlite .v-subtitle .v-subIcon {
-  width: 100%;
-  height: 100%;
-  /* position: absolute;
-  top: 50%;
-  left: 50%;
-  -webkit-transform: translateX(-50%) translateY(-50%);
-  transform: translateX(-50%) translateY(-50%); */
-}
 .v-vlite.v-paused .v-playPauseButton .v-iconPlay {
   display: block;
 }
-.v-vlite .v-time {
-  color: #fff;
-  font-size: var(--font-size);
-  float: left;
-  height: 100%;
-  display: flex;
-  align-items: center;
-}
-.v-vlite .v-volume, .v-vlite .v-subtitle {
-  position: relative;
-  display: inline-block;
-  width: var(--width-bar);
-  height: 100%;
-  cursor: pointer;
-}
 
-.v-vlite .v-fullscreen {
-  position: relative;
-  display: inline-block;
-  width: var(--width-bar);
-  height: 100%;
-  cursor: pointer;
-}
 .v-vlite .v-fullscreen .v-playerIcon {
   display: none;
   height: 100%;
@@ -289,15 +224,6 @@ img {
   opacity: .85;
 }
 
-.v-vlite .v-volume svg, .v-vlite .v-fullscreen svg, .v-vlite .v-subtitle .v-subIcon svg {
-  fill: #fff;
-  transition: opacity .25s;
-  opacity: .85;
-  /* width: 18px;
-  height: 18px; */
-  height: 100%;
-  width: 100%;
-}
 
 
 .vlite-js video {

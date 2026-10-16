@@ -1865,10 +1865,10 @@ const Home = (props) => {
                         {toast}
                       </div>
                     )}
-                    <div className={`v-topBar ${hideUI ? "hidden" : ""}`}>
-                      <span className="v-topTitle">{fileName}</span>
+                    <div className={`v-topBar flex items-center gap-3 absolute top-0 left-0 w-full h-auto min-h-[calc(var(--font-size-title,24px)*1.5)] !pb-[calc(var(--font-size-title,24px)*0.5)] !pt-[5px] !pl-[15px] !pr-[10px] text-left [background:linear-gradient(180deg,#000,hsla(0,0%,100%,0))] [transition:.25s_ease-in] ${hideUI ? "hidden" : ""}`}>
+                      <span className="v-topTitle flex-1 min-w-0 whitespace-nowrap overflow-hidden text-ellipsis !text-[length:var(--font-size-title,24px)]">{fileName}</span>
                       {compactTouch && (
-                        <span className="v-topTime">
+                        <span className="v-topTime shrink-0 whitespace-nowrap !text-[calc(var(--font-size-title,24px)*0.85)]">
                           <Duration seconds={state.duration * (state.seeking ? state.seekingLine : state.played)}></Duration>
                           &nbsp;/&nbsp;
                           <Duration seconds={state.duration}></Duration>
@@ -2003,7 +2003,7 @@ const Home = (props) => {
                             </svg>
                           </span>
                         </div>
-                        <div className="v-time" style={compactTouch ? { display: "none" } : undefined}>
+                        <div className="v-time text-white float-left h-full flex items-center !text-[length:var(--font-size)]" style={compactTouch ? { display: "none" } : undefined}>
                           <span className="v-currentTime">
                             <Duration seconds={state.duration * (state.seeking ? state.seekingLine : state.played)}></Duration>
                           </span>
@@ -2012,8 +2012,8 @@ const Home = (props) => {
                             <Duration seconds={state.duration}></Duration>
                           </span>
                         </div>
-                        <div className={`v-subtitle`} id="play_6" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxTrackHandle()}>
-                          <span className="v-subIcon">
+                        <div className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`} id="play_6" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxTrackHandle()}>
+                          <span className="v-subIcon w-full h-full">
                             <svg
                               className="ytp-subtitles-button-icon"
                               height="100%"
@@ -2118,8 +2118,8 @@ const Home = (props) => {
                             )}
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_7" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxFontHandle()}>
-                          <span className="v-subIcon">
+                        <div className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`} id="play_7" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxFontHandle()}>
+                          <span className="v-subIcon w-full h-full">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <text x="18" y="24" textAnchor="middle" fontSize="15" fontWeight="600" fill="#fff" fontFamily="Helvetica, Arial, sans-serif">Aa</text>
                             </svg>
@@ -2139,8 +2139,8 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_8" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxSpeedHandle()}>
-                          <span className="v-subIcon">
+                        <div className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`} id="play_8" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxSpeedHandle()}>
+                          <span className="v-subIcon w-full h-full">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <text
                                 x="18"
@@ -2177,8 +2177,8 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_9" style={isMouse ? { display: "none" } : undefined} onClick={() => boxDelayHandle()}>
-                          <span className="v-subIcon">
+                        <div className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`} id="play_9" style={isMouse ? { display: "none" } : undefined} onClick={() => boxDelayHandle()}>
+                          <span className="v-subIcon w-full h-full">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.isEmpty(subtitles) ? "0.3" : "1"}`}>
                               <path
                                 d="M18 9a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm-1 3v5.4l4.2 2.5 1-1.6-3.2-1.9V14z"
@@ -2218,8 +2218,8 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_10" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxAudioHandle()}>
-                          <span className="v-subIcon">
+                        <div className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`} id="play_10" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxAudioHandle()}>
+                          <span className="v-subIcon w-full h-full">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.size(audioList) > 1 || isMouse ? "1" : "0.3"}`}>
                               <path
                                 d="M18,8 C12.5,8 8,12.5 8,18 L8,24 C8,25.1 8.9,26 10,26 L12,26 L12,19 L10,19 C10,14.6 13.6,11 18,11 C22.4,11 26,14.6 26,19 L24,19 L24,26 L26,26 C27.1,26 28,25.1 28,24 L28,18 C28,12.5 23.5,8 18,8 Z"
@@ -2267,7 +2267,7 @@ const Home = (props) => {
                             )}
                           </div>
                         </div>
-                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_11" style={isMouse ? { display: "none" } : undefined} onClick={() => setStateElm({ muted: !state.muted })}>
+                        <div className={`v-volume relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_svg]:fill-white [&_svg]:opacity-[.85] [&_svg]:h-full [&_svg]:w-full [&_svg]:[transition:opacity_.25s] ${state.muted ? "v-muted" : ""}`} id="play_11" style={isMouse ? { display: "none" } : undefined} onClick={() => setStateElm({ muted: !state.muted })}>
                           <span className="v-playerIcon v-iconVolumeHigh">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <path
@@ -2288,7 +2288,7 @@ const Home = (props) => {
                             </svg>
                           </span>
                         </div>
-                        <div className={`v-fullscreen ${isFullSreen ? "v-exit" : ""}`} id="play_12" onClick={() => handleFullSreen(!isFullSreen)}>
+                        <div className={`v-fullscreen relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_svg]:fill-white [&_svg]:opacity-[.85] [&_svg]:h-full [&_svg]:w-full [&_svg]:[transition:opacity_.25s] ${isFullSreen ? "v-exit" : ""}`} id="play_12" onClick={() => handleFullSreen(!isFullSreen)}>
                           <span className="v-playerIcon v-iconFullscreen">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <g className="ytp-fullscreen-button-corner-0">
