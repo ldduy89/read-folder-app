@@ -17,7 +17,7 @@ const Home = () => {
   }, [rootPath]);
 
   return (
-    <header className="flex min-h-screen flex-col items-center justify-center bg-[#282c34] text-[calc(10px_+_2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:justify-start max-[800px]:overflow-x-clip">
+    <header className="flex min-h-screen flex-col items-center justify-start bg-[#282c34] text-[calc(10px_+_2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:overflow-x-clip">
       <div id="body" className="w-full">
         {file?.map((f) => (
           <div>

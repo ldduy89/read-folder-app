@@ -1584,7 +1584,7 @@ const Home = (props) => {
           }
         }}
       >
-        <header className="flex min-h-screen flex-col items-center justify-center bg-[#282c34] text-[calc(10px_+_2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:justify-start max-[800px]:overflow-x-clip">
+        <header className="flex min-h-screen flex-col items-center justify-start bg-[#282c34] text-[calc(10px_+_2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:overflow-x-clip">
           <div className="mx-auto box-border w-[1000px] max-w-full overflow-auto text-left text-[20px] h-[900px] max-[800px]:h-auto max-[800px]:w-full max-[800px]:overflow-visible max-[800px]:px-3 max-[800px]:pt-3 max-[800px]:pb-8 max-[800px]:text-[16px]" id="body" style={isMouse && type === "file" ? { width: "96vw", maxWidth: "1800px", height: "auto", overflow: "visible" } : undefined}>
             {/* Hàng đầu trang: nút quay lại (icon) + đường dẫn mục. Trang xem file không hiện tên file. */}
             <div className="flex items-start gap-3 mb-6 min-w-0 pt-4 compact:items-center compact:gap-2 compact:mb-2 compact:px-0 compact:pb-0">
