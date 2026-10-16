@@ -80,10 +80,10 @@ img {
   font: inherit;
   vertical-align: baseline;
 }
-.v-vlite.v-paused .v-controlBar.hidden, .v-vlite.v-paused .v-topBar.hidden {
+.v-vlite.v-paused .v-controlBar.ui-hidden, .v-vlite.v-paused .v-topBar.ui-hidden {
   opacity: 1;
 }
-.v-vlite .v-controlBar.hidden, .v-vlite .v-topBar.hidden {
+.v-vlite .v-controlBar.ui-hidden, .v-vlite .v-topBar.ui-hidden {
   opacity: 0;
 }
 .v-playing.nocursor:fullscreen { 
@@ -275,52 +275,6 @@ img {
     opacity: 0;
     visibility: hidden;
 } 
-.v-controlButton:hover {
-  opacity: 1;
-}
-.v-controlButton {
-  -webkit-appearance: none;
-  appearance: none;
-  align-items: center;
-  background: none;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  display: flex;
-  font-family: inherit;
-  font-size: inherit;
-  height: 100%;
-  justify-content: center;
-  opacity: 0.9;
-  outline: none;
-  padding: 0;
-  position: relative;
-  transition: opacity 0.25s ease;
-  width: var(--width-bar);
-}
-.v-bigPlay {
-  height: calc(var(--width-bar, 50px) * 1.2);
-  left: 50%;
-  position: absolute;
-  top: 50%;
-  transform: translateX(-50%) translateY(-50%);
-  width: calc(var(--width-bar, 50px) * 1.2);
-  z-index: 2;
-}
-.v-bigPlay svg {
-  fill: #fff;
-  height: 100%;
-  opacity: 0.9;
-  width: 100%;
-}
-.v-bigPlay, .v-bigPlay svg {
-  transition: opacity 0.25s ease;
-}
-.v-controlButton svg {
-  fill: #fff;
-  height: 65px;
-  width: 65px;
-}
 
 .App-item.focus {
   border: 1px solid #808080;
@@ -390,7 +344,7 @@ img {
     height: 100%;
   }
   /* Khi thanh điều khiển đã ẩn lúc đang phát thì không nhận chạm nhầm vào nút vô hình */
-  .v-vlite.v-playing .v-controlBar.hidden {
+  .v-vlite.v-playing .v-controlBar.ui-hidden {
     pointer-events: none;
   }
   /* Mục trong menu (phụ đề, tốc độ, audio, độ trễ): cỡ cảm ứng đã chuyển sang Tailwind (coarse:...) */

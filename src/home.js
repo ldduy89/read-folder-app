@@ -1865,7 +1865,7 @@ const Home = (props) => {
                         {toast}
                       </div>
                     )}
-                    <div className={`v-topBar flex items-center gap-3 absolute top-0 left-0 w-full h-auto min-h-[calc(var(--font-size-title,24px)*1.5)] !pb-[calc(var(--font-size-title,24px)*0.5)] !pt-[5px] !pl-[15px] !pr-[10px] text-left [background:linear-gradient(180deg,#000,hsla(0,0%,100%,0))] [transition:.25s_ease-in] ${hideUI ? "hidden" : ""}`}>
+                    <div className={`v-topBar flex items-center gap-3 absolute top-0 left-0 w-full h-auto min-h-[calc(var(--font-size-title,24px)*1.5)] !pb-[calc(var(--font-size-title,24px)*0.5)] !pt-[5px] !pl-[15px] !pr-[10px] text-left [background:linear-gradient(180deg,#000,hsla(0,0%,100%,0))] [transition:.25s_ease-in] ${hideUI ? "ui-hidden" : ""}`}>
                       <span className="v-topTitle flex-1 min-w-0 whitespace-nowrap overflow-hidden text-ellipsis !text-[length:var(--font-size-title,24px)]">{fileName}</span>
                       {compactTouch && (
                         <span className="v-topTime shrink-0 whitespace-nowrap !text-[calc(var(--font-size-title,24px)*0.85)]">
@@ -1938,12 +1938,12 @@ const Home = (props) => {
                         {tapHint.side === "left" ? `« ${tapHint.total} giây` : `${tapHint.total} giây »`}
                       </div>
                     )}
-                    <button className="v-bigPlay v-controlButton" aria-label="Play" onClick={() => setStateElm({ playing: !state.playing })}>
+                    <button className="v-bigPlay absolute left-1/2 top-1/2 z-[2] [transform:translateX(-50%)_translateY(-50%)] [height:calc(var(--width-bar,50px)*1.2)] [width:calc(var(--width-bar,50px)*1.2)] flex items-center justify-center p-0 border-none outline-none cursor-pointer appearance-none [background:none] [color:inherit] [font-family:inherit] [font-size:inherit] opacity-90 hover:opacity-100 [transition:opacity_0.25s_ease] [&_svg]:fill-white [&_svg]:h-full [&_svg]:w-full [&_svg]:opacity-90 [&_svg]:[transition:opacity_0.25s_ease]" aria-label="Play" onClick={() => setStateElm({ playing: !state.playing })}>
                       <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                         <path d="M10 0C4.48 0 0 4.48 0 10s4.48 10 10 10 10-4.48 10-10S15.52 0 10 0ZM7.5 12.67V7.33c0-.79.88-1.27 1.54-.84l4.15 2.67a1 1 0 0 1 0 1.68l-4.15 2.67c-.66.43-1.54-.05-1.54-.84Z"></path>
                       </svg>
                     </button>
-                    <div className={`v-controlBar ${hideUI ? "hidden" : ""}`}>
+                    <div className={`v-controlBar ${hideUI ? "ui-hidden" : ""}`}>
                       <div className="v-progressBar" id="play_0">
                         <div className="v-progressSeek" style={{ width: `${(state.seeking ? state.seekingLine : state.played) * 100}%` }}></div>
                         <input

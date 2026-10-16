@@ -35,6 +35,9 @@
 .top-0 {
   top: 0px;
 }
+.top-1\/2 {
+  top: calc(1 / 2 * 100%);
+}
 .\!right-0 {
   right: 0px !important;
 }
@@ -52,6 +55,9 @@
 }
 .z-30 {
   z-index: 30;
+}
+.z-\[2\] {
+  z-index: 2;
 }
 .float-left {
   float: left;
@@ -110,6 +116,9 @@
 .inline-flex {
   display: inline-flex;
 }
+.\[height\:calc\(var\(--width-bar\,50px\)\*1\.2\)\] {
+  height: calc(var(--width-bar,50px) * 1.2);
+}
 .h-10 {
   height: calc(var(--spacing) * 10);
 }
@@ -142,6 +151,9 @@
 }
 .min-h-screen {
   min-height: 100vh;
+}
+.\[width\:calc\(var\(--width-bar\,50px\)\*1\.2\)\] {
+  width: calc(var(--width-bar,50px) * 1.2);
 }
 .w-10 {
   width: calc(var(--spacing) * 10);
@@ -184,6 +196,9 @@
 }
 .\[transform\:translateX\(-50\%\)\] {
   transform: translateX(-50%);
+}
+.\[transform\:translateX\(-50\%\)_translateY\(-50\%\)\] {
+  transform: translateX(-50%) translateY(-50%);
 }
 .transform {
   transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
@@ -325,6 +340,9 @@
 .\!p-\[0\.8em_0\.8em_0\.7em\] {
   padding: 0.8em 0.8em 0.7em !important;
 }
+.p-0 {
+  padding: 0px;
+}
 .p-3 {
   padding: calc(var(--spacing) * 3);
 }
@@ -448,6 +466,9 @@
 .\!text-\[length\:var\(--font-size-title\,24px\)\] {
   font-size: var(--font-size-title,24px) !important;
 }
+.\[font-size\:inherit\] {
+  font-size: inherit;
+}
 .text-\[0\.7em\] {
   font-size: 0.7em;
 }
@@ -521,6 +542,9 @@
 .\!text-\[\#ffd700\] {
   color: #ffd700 !important;
 }
+.\[color\:inherit\] {
+  color: inherit;
+}
 .text-\[\#1b2233\] {
   color: #1b2233;
 }
@@ -563,6 +587,9 @@
 .opacity-0 {
   opacity: 0%;
 }
+.opacity-90 {
+  opacity: 90%;
+}
 .opacity-100 {
   opacity: 100%;
 }
@@ -593,6 +620,9 @@
 .\[background\:linear-gradient\(180deg\,\#000\,hsla\(0\,0\%\,100\%\,0\)\)\] {
   background: linear-gradient(180deg,#000,hsla(0,0%,100%,0));
 }
+.\[background\:none\] {
+  background: none;
+}
 .\[transition\:\.25s_ease-in\] {
   transition: .25s ease-in;
 }
@@ -604,6 +634,9 @@
 }
 .\[transition\:opacity_0\.25s_ease\,visibility_0\.25s_ease\] {
   transition: opacity 0.25s ease,visibility 0.25s ease;
+}
+.\[transition\:opacity_0\.25s_ease\] {
+  transition: opacity 0.25s ease;
 }
 @media (hover: hover) {
   .hover\:border-\[\#61dafb\]:hover {
@@ -623,6 +656,9 @@
   }
   .hover\:text-\[\#61dafb\]:hover {
     color: #61dafb;
+  }
+  .hover\:opacity-100:hover {
+    opacity: 100%;
   }
 }
 .focus-visible\:border-\[rgba\(255\,255\,255\,0\.7\)\]:focus-visible {
@@ -793,11 +829,17 @@
 .\[\&_svg\]\:text-\[\#2b4a7e\] svg {
   color: #2b4a7e;
 }
+.\[\&_svg\]\:opacity-90 svg {
+  opacity: 90%;
+}
 .\[\&_svg\]\:opacity-\[\.85\] svg {
   opacity: .85;
 }
 .\[\&_svg\]\:\[transition\:opacity_\.25s\] svg {
   transition: opacity .25s;
+}
+.\[\&_svg\]\:\[transition\:opacity_0\.25s_ease\] svg {
+  transition: opacity 0.25s ease;
 }
 @media (max-width: 900px), (max-height: 520px) {
   .compact\:\[\&_svg\]\:h-\[22px\] svg {
