@@ -294,6 +294,7 @@ const Home = (props) => {
   popupRef.current = { trWord: !!trWord, boxTracks, boxAudio, boxSpeed, boxDelay, boxFont };
 
   if (!_.isEmpty(textTracks) && !_.isEmpty(subtitles)) {
+    const subtitle = subtitles.find((s) => s.default);
     for (const element of textTracks) {
       element.mode = "hidden"; // phụ đề tự vẽ bằng overlay (nền đen đặc)
     }
@@ -1660,9 +1661,9 @@ const Home = (props) => {
           }
         }}
       >
-        <header className="flex min-h-screen flex-col items-center justify-start bg-[#282c34] text-[calc(10px+2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:overflow-x-clip">
+        <header className="flex min-h-screen flex-col items-center justify-start bg-[#282c34] text-[calc(10px_+_2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:overflow-x-clip">
           <div
-            className="mx-auto box-border w-250 max-w-full overflow-auto text-left text-[20px] h-225 max-[800px]:h-auto max-[800px]:w-full max-[800px]:overflow-visible max-[800px]:px-3 max-[800px]:pt-3 max-[800px]:pb-8 max-[800px]:text-[16px]"
+            className="mx-auto box-border w-[1000px] max-w-full overflow-auto text-left text-[20px] h-[900px] max-[800px]:h-auto max-[800px]:w-full max-[800px]:overflow-visible max-[800px]:px-3 max-[800px]:pt-3 max-[800px]:pb-8 max-[800px]:text-[16px]"
             id="body"
             style={isMouse && type === "file" ? { width: "96vw", maxWidth: "1800px", height: "auto", overflow: "visible" } : undefined}
           >
@@ -1671,7 +1672,7 @@ const Home = (props) => {
               {root !== "" && (
                 <Link
                   id={`back_0`}
-                  className="flex-none inline-flex items-center justify-center w-10 h-10 rounded-full text-[aliceblue] no-underline [-webkit-tap-highlight-color:transparent] outline-none [&_svg]:w-6.5 [&_svg]:h-6.5 hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] compact:w-8.5 compact:h-8.5 compact:[&_svg]:w-5.5 compact:[&_svg]:h-5.5"
+                  className="flex-none inline-flex items-center justify-center w-10 h-10 rounded-full text-[aliceblue] no-underline [-webkit-tap-highlight-color:transparent] outline-none [&_svg]:w-[26px] [&_svg]:h-[26px] hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] compact:w-[34px] compact:h-[34px] compact:[&_svg]:w-[22px] compact:[&_svg]:h-[22px]"
                   to={`/${backRootPath}`}
                   title="Quay lại"
                   aria-label="Quay lại"
@@ -1679,7 +1680,7 @@ const Home = (props) => {
                   <ArrowBackIcon />
                 </Link>
               )}
-              <div className="flex-[1_1_auto] min-w-0 pt-1.75 leading-[1.3] wrap-anywhere compact:pt-0 compact:text-[15px]">
+              <div className="flex-[1_1_auto] min-w-0 pt-[7px] leading-[1.3] [overflow-wrap:anywhere] compact:pt-0 compact:text-[15px]">
                 <b>
                   {root !== "" ? (
                     <Link id={`path_0`} to="/">
@@ -1710,7 +1711,7 @@ const Home = (props) => {
                   {type === "file" && (
                     <button
                       type="button"
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-8.5 compact:h-8.5 compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full bg-transparent font-[inherit] cursor-pointer ${audioOnly ? "border-[#ffd700]! bg-[rgba(255,215,0,0.2)]!" : ""}`}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full bg-transparent font-[inherit] text-white cursor-pointer ${audioOnly ? "!border-[#ffd700] !bg-[rgba(255,215,0,0.2)]" : ""}`}
                       onClick={toggleAudioOnly}
                       aria-pressed={audioOnly}
                       title={audioOnly ? "Hiện video (V)" : "Chỉ nghe tiếng, ẩn video (V)"}
@@ -1729,7 +1730,7 @@ const Home = (props) => {
                   {type === "file" && !_.isEmpty(subtitles) && (
                     <button
                       type="button"
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-8.5 compact:h-8.5 compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full bg-transparent font-[inherit] cursor-pointer ${cuePanelHidden ? "border-[#ffd700]! bg-[rgba(255,215,0,0.2)]!" : ""}`}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full bg-transparent font-[inherit] text-white cursor-pointer ${cuePanelHidden ? "!border-[#ffd700] !bg-[rgba(255,215,0,0.2)]" : ""}`}
                       onClick={() => setCuePanelHidden(!cuePanelHidden)}
                       aria-pressed={cuePanelHidden}
                       title={cuePanelHidden ? "Hiện khung phụ đề bên phải" : "Ẩn khung phụ đề bên phải"}
@@ -1740,7 +1741,7 @@ const Home = (props) => {
                     </button>
                   )}
                   <a
-                    className="inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-8.5 compact:h-8.5 compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full"
                     href="/translate-words"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -1751,7 +1752,7 @@ const Home = (props) => {
                     <span className="compact:hidden">Từ đã lưu</span>
                   </a>
                   <a
-                    className="inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-8.5 compact:h-8.5 compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full"
                     href="/translate-settings"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -1769,12 +1770,12 @@ const Home = (props) => {
                 const fullPath = _.filter([root, pathName, folder.name], (elm) => !!elm).join("/");
                 return (
                   <div
-                    className={`App-item py-1.25 max-[800px]:flex max-[800px]:items-start max-[800px]:py-2.25 ${indexFile === index ? "f-active" : ""}`}
+                    className={`App-item py-[5px] max-[800px]:flex max-[800px]:items-start max-[800px]:py-[9px] ${indexFile === index ? "f-active" : ""}`}
                     id={`file_${index}`}
                     key={index}
                   >
                     <img
-                      className="max-[800px]:w-4.5 max-[800px]:flex-none max-[800px]:mt-0.75"
+                      className="max-[800px]:w-[18px] max-[800px]:flex-none max-[800px]:mt-[3px]"
                       src={folder.type === "file" ? fileIcon : folderIcon}
                       alt="icon"
                     />
@@ -1783,7 +1784,7 @@ const Home = (props) => {
                     {isMouse && folder.type === "folder" && (root !== "" || folder.picked) && (
                       <button
                         type="button"
-                        className={`ml-3 rounded-full border border-[#808080] bg-transparent px-2.5 py-px align-middle flex-none cursor-pointer text-[0.7em] leading-[1.6] text-[#bbb] hover:border-[#61dafb] hover:text-[#61dafb] max-[800px]:ml-auto max-[800px]:px-3 max-[800px]:py-1 max-[800px]:text-[0.8em] ${folder.picked ? "border-[#ffd700]! text-[#ffd700]!" : ""}`}
+                        className={`ml-3 rounded-full border border-[#808080] bg-transparent px-2.5 py-px align-middle flex-none cursor-pointer text-[0.7em] leading-[1.6] text-[#bbb] hover:border-[#61dafb] hover:text-[#61dafb] max-[800px]:ml-auto max-[800px]:px-3 max-[800px]:py-1 max-[800px]:text-[0.8em] ${folder.picked ? "!border-[#ffd700] !text-[#ffd700]" : ""}`}
                         title={folder.picked ? "Bỏ pick (xoá khỏi trang Home)" : "Pick để hiện ở trang Home"}
                         onClick={(e) => {
                           e.preventDefault();
@@ -1974,13 +1975,13 @@ const Home = (props) => {
                       </div>
                     )}
                     <div
-                      className={`v-topBar flex items-center gap-3 absolute top-0 left-0 w-full h-auto min-h-[calc(var(--font-size-title,24px)*1.5)] pb-[calc(var(--font-size-title,24px)*0.5)]! pt-1.25! pl-3.75! pr-2.5! text-left [background:linear-gradient(180deg,#000,hsla(0,0%,100%,0))] [transition:.25s_ease-in] ${hideUI ? "ui-hidden" : ""}`}
+                      className={`v-topBar flex items-center gap-3 absolute top-0 left-0 w-full h-auto min-h-[calc(var(--font-size-title,24px)*1.5)] !pb-[calc(var(--font-size-title,24px)*0.5)] !pt-[5px] !pl-[15px] !pr-[10px] text-left [background:linear-gradient(180deg,#000,hsla(0,0%,100%,0))] [transition:.25s_ease-in] ${hideUI ? "ui-hidden" : ""}`}
                     >
-                      <span className="v-topTitle flex-1 min-w-0 whitespace-nowrap overflow-hidden text-ellipsis text-(length:--font-size-title,24px)!">
+                      <span className="v-topTitle flex-1 min-w-0 whitespace-nowrap overflow-hidden text-ellipsis !text-[length:var(--font-size-title,24px)]">
                         {fileName}
                       </span>
                       {compactTouch && (
-                        <span className="v-topTime shrink-0 whitespace-nowrap text-[calc(var(--font-size-title,24px)*0.85)]!">
+                        <span className="v-topTime shrink-0 whitespace-nowrap !text-[calc(var(--font-size-title,24px)*0.85)]">
                           <Duration seconds={state.duration * (state.seeking ? state.seekingLine : state.played)}></Duration>
                           &nbsp;/&nbsp;
                           <Duration seconds={state.duration}></Duration>
@@ -2049,7 +2050,7 @@ const Home = (props) => {
                       </div>
                     )}
                     <button
-                      className="v-bigPlay absolute left-1/2 top-1/2 z-2 transform-[translateX(-50%)_translateY(-50%)] h-[calc(var(--width-bar,50px)*1.2)] w-[calc(var(--width-bar,50px)*1.2)] flex items-center justify-center p-0 border-none outline-none cursor-pointer appearance-none [background:none] text-inherit font-[inherit] [font-size:inherit] opacity-90 hover:opacity-100 [transition:opacity_0.25s_ease] [&_svg]:fill-white [&_svg]:h-full [&_svg]:w-full [&_svg]:opacity-90 [&_svg]:[transition:opacity_0.25s_ease]"
+                      className="v-bigPlay absolute left-1/2 top-1/2 z-[2] [transform:translateX(-50%)_translateY(-50%)] [height:calc(var(--width-bar,50px)*1.2)] [width:calc(var(--width-bar,50px)*1.2)] flex items-center justify-center p-0 border-none outline-none cursor-pointer appearance-none [background:none] [color:inherit] [font-family:inherit] [font-size:inherit] opacity-90 hover:opacity-100 [transition:opacity_0.25s_ease] [&_svg]:fill-white [&_svg]:h-full [&_svg]:w-full [&_svg]:opacity-90 [&_svg]:[transition:opacity_0.25s_ease]"
                       aria-label="Play"
                       onClick={() => setStateElm({ playing: !state.playing })}
                     >
@@ -2114,7 +2115,7 @@ const Home = (props) => {
                           </span>
                         </div>
                         <div
-                          className="v-time text-white float-left h-full flex items-center text-(length:--font-size)!"
+                          className="v-time text-white float-left h-full flex items-center !text-[length:var(--font-size)]"
                           style={compactTouch ? { display: "none" } : undefined}
                         >
                           <span className="v-currentTime">
@@ -2126,7 +2127,7 @@ const Home = (props) => {
                           </span>
                         </div>
                         <div
-                          className={`v-subtitle relative inline-block w-(--width-bar) h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`}
+                          className={`v-subtitle relative inline-block w-[var(--width-bar)] h-full cursor-pointer [&_.v-subIcon_svg]:fill-white [&_.v-subIcon_svg]:opacity-[.85] [&_.v-subIcon_svg]:h-full [&_.v-subIcon_svg]:w-full [&_.v-subIcon_svg]:[transition:opacity_.25s]`}
                           id="play_6"
                           style={hideExtraIcons ? { display: "none" } : undefined}
                           onClick={() => boxTrackHandle()}
@@ -2135,17 +2136,17 @@ const Home = (props) => {
                             <SubtitlesIcon height="100%" width="100%" fillOpacity={`${_.isEmpty(subtitles) ? "0.3" : "1"}`} />
                           </span>
                           <div
-                            className={`v-subtitlesList box-border p-[0.8em_0.8em_0.7em]! bg-[rgba(250,250,252,0.98)] text-[#1b2233] border! border-solid! border-[rgba(0,0,0,0.06)]! rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-auto max-w-[calc(100vw-20px)] max-h-(--menu-max-h,70vh) absolute bottom-[calc(var(--width-bar)+var(--bar-gap,0px))] left-1/2 z-30 transform-[translateX(-50%)] [transition:opacity_0.25s_ease,visibility_0.25s_ease] ${boxTracks ? "v-active opacity-100 visible" : "opacity-0 invisible"}`}
+                            className={`v-subtitlesList box-border !p-[0.8em_0.8em_0.7em] bg-[rgba(250,250,252,0.98)] text-[#1b2233] !border !border-solid !border-[rgba(0,0,0,0.06)] rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-auto max-w-[calc(100vw-20px)] max-h-[var(--menu-max-h,70vh)] absolute bottom-[calc(var(--width-bar)+var(--bar-gap,0px))] left-1/2 z-30 [transform:translateX(-50%)] [transition:opacity_0.25s_ease,visibility_0.25s_ease] ${boxTracks ? "v-active opacity-100 visible" : "opacity-0 invisible"}`}
                           >
                             <div style={{ display: "flex", alignItems: "flex-start" }}>
-                              <ul className="v-subCol px-[0.45em]! py-0! first:pl-0! last:pr-0! [&+&]:ml-[0.45em]! [&+&]:pl-[0.9em]! [&+&]:border-l! [&+&]:border-solid! [&+&]:border-[#e6e8ec]!">
-                                <li className="flex items-center gap-[0.6em] px-[0.3em]! pt-[0.2em]! pb-[0.6em]! text-[1em]! font-medium! whitespace-nowrap pointer-events-none text-[#46557a]">
+                              <ul className="v-subCol !px-[0.45em] !py-0 [&:first-child]:!pl-0 [&:last-child]:!pr-0 [&+&]:!ml-[0.45em] [&+&]:!pl-[0.9em] [&+&]:!border-l [&+&]:!border-solid [&+&]:!border-[#e6e8ec]">
+                                <li className="flex items-center gap-[0.6em] !px-[0.3em] !pt-[0.2em] !pb-[0.6em] !text-[1em] !font-medium whitespace-nowrap pointer-events-none text-[#46557a]">
                                   <CcIcon />
                                   Sub 1
                                 </li>
                                 <li id={`sub_0`} onClick={() => changeSubtitle(null)}>
                                   <button
-                                    className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer font-[inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:bg-[#e6eeff]! [&.v-active]:text-[#0f1a33]! [&.v-active]:font-semibold! [&.v-action]:pr-[1.1em] coarse:min-h-11 coarse:p-[10px_44px_10px_16px]! [&.v-action]:coarse:pr-4! ${!subtitles || !subtitles.find((s) => !!s.default) ? "v-active" : ""}`}
+                                    className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${!subtitles || !subtitles.find((s) => !!s.default) ? "v-active" : ""}`}
                                     data-language="off"
                                   >
                                     <CheckIcon />
@@ -2157,7 +2158,7 @@ const Home = (props) => {
                                     return (
                                       <li id={`sub_${index + 1}`} onClick={() => changeSubtitle(sub.language)} key={index}>
                                         <button
-                                          className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer font-[inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:bg-[#e6eeff]! [&.v-active]:text-[#0f1a33]! [&.v-active]:font-semibold! [&.v-action]:pr-[1.1em] coarse:min-h-11 coarse:p-[10px_44px_10px_16px]! [&.v-action]:coarse:pr-4! ${sub.default ? "v-active" : ""}`}
+                                          className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${sub.default ? "v-active" : ""}`}
                                           data-language="off"
                                         >
                                           <CheckIcon />
@@ -2168,14 +2169,14 @@ const Home = (props) => {
                                   })}
                               </ul>
                               {subtitles && subtitles.length > 1 && (
-                                <ul className="v-subCol px-[0.45em]! py-0! first:pl-0! last:pr-0! [&+&]:ml-[0.45em]! [&+&]:pl-[0.9em]! [&+&]:border-l! [&+&]:border-solid! [&+&]:border-[#e6e8ec]!">
-                                  <li className="flex items-center gap-[0.6em] px-[0.3em]! pt-[0.2em]! pb-[0.6em]! text-[1em]! font-medium! whitespace-nowrap pointer-events-none text-[#46557a]">
+                                <ul className="v-subCol !px-[0.45em] !py-0 [&:first-child]:!pl-0 [&:last-child]:!pr-0 [&+&]:!ml-[0.45em] [&+&]:!pl-[0.9em] [&+&]:!border-l [&+&]:!border-solid [&+&]:!border-[#e6e8ec]">
+                                  <li className="flex items-center gap-[0.6em] !px-[0.3em] !pt-[0.2em] !pb-[0.6em] !text-[1em] !font-medium whitespace-nowrap pointer-events-none text-[#46557a]">
                                     <CcIcon />
                                     Sub 2
                                   </li>
                                   <li id="sub2_0" onClick={() => chooseSecondSub(null)}>
                                     <button
-                                      className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer font-[inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:bg-[#e6eeff]! [&.v-active]:text-[#0f1a33]! [&.v-active]:font-semibold! [&.v-action]:pr-[1.1em] coarse:min-h-11 coarse:p-[10px_44px_10px_16px]! [&.v-action]:coarse:pr-4! ${!secLang ? "v-active" : ""}`}
+                                      className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${!secLang ? "v-active" : ""}`}
                                       data-language="off"
                                     >
                                       <CheckIcon />
@@ -2187,7 +2188,7 @@ const Home = (props) => {
                                     .map((sub, index) => (
                                       <li id={`sub2_${index + 1}`} onClick={() => chooseSecondSub(sub.language)} key={`s2_${index}`}>
                                         <button
-                                          className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer font-[inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:bg-[#e6eeff]! [&.v-active]:text-[#0f1a33]! [&.v-active]:font-semibold! [&.v-action]:pr-[1.1em] coarse:min-h-11 coarse:p-[10px_44px_10px_16px]! [&.v-action]:coarse:pr-4! ${secLang === sub.language ? "v-active" : ""}`}
+                                          className={`v-trackButton block w-full appearance-none border-none outline-none cursor-pointer [font-family:inherit] text-left relative whitespace-nowrap bg-[#f3f4f6] text-[#1b2233] rounded-[10px] py-[0.6em] pl-[1em] pr-[2.8em] [transition:background-color_0.25s_ease] hover:bg-[#eceef3] [&.v-active]:!bg-[#e6eeff] [&.v-active]:!text-[#0f1a33] [&.v-active]:!font-semibold [&.v-action]:pr-[1.1em] coarse:min-h-[44px] coarse:!p-[10px_44px_10px_16px] [&.v-action]:coarse:!pr-[16px] ${secLang === sub.language ? "v-active" : ""}`}
                                           data-language="off"
                                         >
                                           <CheckIcon />
@@ -2201,7 +2202,7 @@ const Home = (props) => {
                             {/* Chỉnh độ trễ phụ đề: lùi / tới / reset (PC + điện thoại; TV dùng nút đồng hồ riêng) */}
                             {isMouse && (
                               <div
-                                className="flex gap-[0.4em] mt-[0.3em]! pt-[0.8em]! pb-0! px-0! border-t! border-solid! border-[#e6e8ec]!"
+                                className="flex gap-[0.4em] !mt-[0.3em] !pt-[0.8em] !pb-0 !px-0 !border-t !border-solid !border-[#e6e8ec]"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <button
@@ -2372,7 +2373,7 @@ const Home = (props) => {
                             <HeadphoneWhiteIcon height="100%" width="100%" fillOpacity={`${_.size(audioList) > 1 || isMouse ? "1" : "0.3"}`} />
                           </span>
                           <div
-                            className={`v-subtitlesList box-border p-[0.8em_0.8em_0.7em]! bg-[rgba(250,250,252,0.98)] text-[#1b2233] !border !border-solid !border-[rgba(0,0,0,0.06)] rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-auto max-w-[calc(100vw-20px)] max-h-[var(--menu-max-h,70vh)] absolute bottom-[calc(var(--width-bar)+var(--bar-gap,0px))] left-1/2 z-30 [transform:translateX(-50%)] [transition:opacity_0.25s_ease,visibility_0.25s_ease] !left-auto !right-0 ![transform:none] v-popRight ${boxAudio ? "v-active opacity-100 visible" : "opacity-0 invisible"}`}
+                            className={`v-subtitlesList box-border !p-[0.8em_0.8em_0.7em] bg-[rgba(250,250,252,0.98)] text-[#1b2233] !border !border-solid !border-[rgba(0,0,0,0.06)] rounded-[14px] shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-auto max-w-[calc(100vw-20px)] max-h-[var(--menu-max-h,70vh)] absolute bottom-[calc(var(--width-bar)+var(--bar-gap,0px))] left-1/2 z-30 [transform:translateX(-50%)] [transition:opacity_0.25s_ease,visibility_0.25s_ease] !left-auto !right-0 ![transform:none] v-popRight ${boxAudio ? "v-active opacity-100 visible" : "opacity-0 invisible"}`}
                           >
                             <ul>
                               {audioList.map((audio, index) => (
@@ -2401,7 +2402,11 @@ const Home = (props) => {
                                     handleAutoHide();
                                   }}
                                 >
-                                  {state.muted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+                                  {state.muted ? (
+                                    <VolumeOffIcon />
+                                  ) : (
+                                    <VolumeUpIcon />
+                                  )}
                                   {state.muted ? "Đang tắt âm - bấm để bật" : "Tắt âm"}
                                 </button>
                               </div>
