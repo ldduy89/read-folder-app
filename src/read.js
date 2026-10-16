@@ -18,7 +18,7 @@ const Home = () => {
 
   return (
     <header className="App-header">
-      <div id="body" style={{ width: "100%" }}>
+      <div id="body" className="w-full">
         {file?.map((f) => (
           <div>
             {f}

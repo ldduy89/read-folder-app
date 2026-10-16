@@ -5,9 +5,9 @@ import { CSS } from "./translateWords";
 
 // Khối hướng dẫn gấp/mở được, đặt ngay dưới tiêu đề mỗi mục
 const Guide = ({ title, children }) => (
-  <details open className="guide" style={{ margin: "2px 0 10px", color: "var(--muted)", lineHeight: 1.6, fontSize: 13 }}>
-    <summary style={{ cursor: "pointer", color: "var(--accent)", userSelect: "none" }}>{title}</summary>
-    <ol style={{ margin: "6px 0 0", paddingLeft: 22 }}>{children}</ol>
+  <details open className="guide mt-0.5 mb-2.5 text-[13px] leading-[1.6] text-[var(--muted)]">
+    <summary className="cursor-pointer select-none text-[var(--accent)]">{title}</summary>
+    <ol className="mt-1.5 pl-[22px]">{children}</ol>
   </details>
 );
 
@@ -87,7 +87,7 @@ const Settings = ({ apiBase }) => {
     <div className="settings">
       <h2>Ngôn ngữ đích</h2>
       <div className="row">
-        <input type="text" style={{ width: 90 }} value={target} onChange={(e) => setTargetState(e.target.value)} placeholder="vi" />
+        <input type="text" className="w-[90px]" value={target} onChange={(e) => setTargetState(e.target.value)} placeholder="vi" />
         <button className="btn" onClick={saveTarget}>
           Lưu
         </button>
@@ -167,9 +167,9 @@ const TranslateSettings = () => {
     <div className="tw">
       <style>{CSS}</style>
       <div className="wrap">
-        <div className="top" style={{ alignItems: "center" }}>
+        <div className="top items-center">
           <a className="btn" href="/translate-words">← Từ đã lưu</a>
-          <h1 style={{ fontSize: 18, margin: 0 }}>Cài đặt dịch</h1>
+          <h1 className="m-0 text-[18px]">Cài đặt dịch</h1>
         </div>
         <Settings apiBase={apiBase} />
       </div>
