@@ -592,23 +592,39 @@ const Home = (props) => {
 
   const formatDelay = (d) => `${d > 0 ? "+" : ""}${d.toFixed(1)}s`;
 
-  // Dịch thời gian của tất cả cue (tính từ thời điểm gốc nên không bị cộng dồn sai số)
+  // Kéo dài thời gian hiển thị mỗi sub thêm tối đa 0.5s, nhưng không vượt quá thời điểm bắt đầu của sub kế tiếp
+  const SUB_EXTEND_MAX = 0.5; // giây
+
+  // Dịch thời gian của tất cả cue (tính từ thời điểm gốc nên không bị cộng dồn sai số) và kéo dài thời gian hiển thị
   const applySubDelay = (delay) => {
     const videoEl = document.getElementsByTagName("video")[0];
     if (!videoEl || !videoEl.textTracks) return;
     for (const track of Array.from(videoEl.textTracks)) {
-      if (!track.cues) continue;
-      for (const cue of Array.from(track.cues)) {
-        const applied = cue._subDelay || 0;
-        if (applied === delay) continue;
+      if (!track.cues || !track.cues.length) continue;
+      const cues = Array.from(track.cues);
+      if (cues.every((c) => c._subDelay === delay)) continue;
+      for (const cue of cues) {
         if (cue._origStart === undefined) {
           cue._origStart = cue.startTime;
           cue._origEnd = cue.endTime;
         }
-        cue.startTime = cue._origStart + delay;
-        cue.endTime = cue._origEnd + delay;
-        cue._subDelay = delay;
       }
+      const sorted = cues.slice().sort((a, b) => a._origStart - b._origStart);
+      sorted.forEach((cue, i) => {
+        // sub kế tiếp = cue gần nhất có thời điểm bắt đầu sau thời điểm bắt đầu của cue này
+        let nextStart = Infinity;
+        for (let j = i + 1; j < sorted.length; j++) {
+          if (sorted[j]._origStart > cue._origStart) {
+            nextStart = sorted[j]._origStart;
+            break;
+          }
+        }
+        // không bao giờ rút ngắn: nếu sub kế tiếp bắt đầu trước khi cue này hết thì giữ nguyên thời điểm kết thúc gốc
+        const extEnd = Math.max(cue._origEnd, Math.min(cue._origEnd + SUB_EXTEND_MAX, nextStart));
+        cue.startTime = cue._origStart + delay;
+        cue.endTime = extEnd + delay;
+        cue._subDelay = delay;
+      });
     }
   };
 
@@ -921,10 +937,9 @@ const Home = (props) => {
     handleAutoHide();
   };
 
-  // Phụ đề tải bất đồng bộ / bị nạp lại -> áp lại độ trễ định kỳ khi đang có chỉnh
+  // Phụ đề tải bất đồng bộ / bị nạp lại -> áp lại độ trễ và kéo dài thời gian hiển thị định kỳ
   useEffect(() => {
     applySubDelay(subDelay);
-    if (subDelay === 0) return;
     const id = setInterval(() => applySubDelay(subDelay), 1000);
     return () => clearInterval(id);
   }, [subDelay]);
