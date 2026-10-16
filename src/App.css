@@ -533,43 +533,6 @@ img {
   overflow-wrap: anywhere; /* tên file rất dài không tràn ra ngoài nền tối */
 }
 
-/* ---- Hàng đầu trang: nút quay lại (icon) cùng hàng với đường dẫn mục ---- */
-.App-pathbar {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-.App-back {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  color: aliceblue;
-  text-decoration: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.App-back svg {
-  width: 26px;
-  height: 26px;
-}
-.App-back:hover,
-.App-back:focus-visible {
-  background: rgba(255, 255, 255, 0.14);
-  outline: none;
-}
-.App-path {
-  flex: 1;
-  min-width: 0;
-  padding-top: 7px;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
-
 /* ===== Popup chọn sub / tốc độ / audio: thẻ sáng, hàng bo tròn, ô tròn chọn bên phải ===== */
 /* (.v-vlite div/ul/li ở trên đặt padding:0 border:0 nên các luật dưới đây phải có .v-vlite để thắng) */
 .v-vlite .v-subtitlesList {
@@ -746,71 +709,6 @@ img {
 }
 
 
-/* Nút ở góc phải trên của thanh đường dẫn: từ đã lưu + cấu hình dịch */
-.App-tools {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.App-tool {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  font-size: 15px;
-  line-height: 1.4;
-  color: #fff;
-  text-decoration: none;
-  white-space: nowrap;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 8px;
-}
-.App-tool:hover,
-.App-tool:focus-visible {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.7);
-}
-
-/* ---- Điện thoại / màn hình hẹp hoặc thấp (điện thoại nằm ngang): thanh trên cùng gọn, không cố định khi cuộn ----
-   Đặt cuối file để thắng các luật .App-tool ở trên (cùng độ ưu tiên thì luật nằm sau thắng) */
-@media (max-width: 900px), (max-height: 520px) {
-  .App-pathbar {
-    position: static;
-    align-items: center;
-    gap: 8px;
-    padding: 0;
-    margin-bottom: 8px;
-  }
-  .App-back {
-    width: 34px;
-    height: 34px;
-  }
-  .App-back svg {
-    width: 22px;
-    height: 22px;
-  }
-  .App-path {
-    padding-top: 0;
-    font-size: 15px;
-  }
-  .App-tools {
-    gap: 6px;
-  }
-  .App-tool {
-    box-sizing: border-box;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    justify-content: center;
-    font-size: 17px;
-    border-radius: 50%;
-  }
-  .App-toolLabel {
-    display: none;
-  }
-}
-
 /* ---- Chế độ chỉ nghe tiếng: ẩn hình nhưng video vẫn chạy ---- */
 #sample_video.audio-only {
   /* Ẩn hẳn khung video và thanh điều khiển; video vẫn chạy để nghe tiếng.
@@ -824,40 +722,6 @@ img {
 #sample_video.audio-only .v-overlayVideo,
 #sample_video.audio-only .v-bigPlay {
   display: none;
-}
-
-/* Nút chuyển chế độ nghe / xem ở hàng công cụ đầu trang */
-.App-toolBtn {
-  background: transparent;
-  font-family: inherit;
-  color: #fff;
-  cursor: pointer;
-}
-.App-toolBtn.on {
-  border-color: #ffd700;
-  background: rgba(255, 215, 0, 0.2);
-}
-
-
-/* Thanh công cụ luôn hiện đủ nút: thanh đường dẫn co lại, nút được xuống dòng thay vì bị đẩy ra ngoài */
-.App-pathbar {
-  min-width: 0;
-}
-.App-path {
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow-wrap: anywhere;
-}
-.App-tools {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  min-width: 0;
-  max-width: 100%;
-}
-
-/* Chừa khoảng cách phía trên cho thanh đường dẫn và nút công cụ, không sát mép màn hình */
-.App-pathbar {
-  padding-top: 16px;
 }
 
 /* Menu font phụ đề và tốc độ: đánh dấu mục đang trỏ tới khi dùng remote, giống menu sub / audio */
