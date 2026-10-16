@@ -984,3 +984,17 @@ img {
 .App-pathbar {
   padding-top: 16px;
 }
+
+/* Menu font phụ đề và tốc độ: đánh dấu mục đang trỏ tới khi dùng remote, giống menu sub / audio */
+.fo-active,
+.sp-active {
+  background-color: #818080c5;
+}
+.v-subtitlesList .fo-active,
+.v-subtitlesList .sp-active {
+  background: transparent;
+}
+.v-remote .v-subtitlesList .fo-active > .v-trackButton,
+.v-remote .v-subtitlesList .sp-active > .v-trackButton {
+  box-shadow: inset 0 0 0 2px #1f5eff; /* ô đang trỏ tới khi dùng remote / phím */
+}

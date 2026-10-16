@@ -238,6 +238,8 @@ const Home = (props) => {
   const [audioList, setAudioList] = useState([]);
   const [boxAudio, setBoxAudio] = useState(false);
   const [boxFont, setBoxFont] = useState(false); // menu chọn font phụ đề
+  const [indexFont, setIndexFont] = useState(0); // mục đang chọn (remote) trong menu font
+  const [indexSpeed, setIndexSpeed] = useState(0); // mục đang chọn (remote) trong menu tốc độ
   const [boxSpeed, setBoxSpeed] = useState(false); // menu tốc độ phát
   const [boxDelay, setBoxDelay] = useState(false); // menu chỉnh độ trễ phụ đề
   const [indexDelay, setIndexDelay] = useState(0);
@@ -507,6 +509,7 @@ const Home = (props) => {
 
   const boxFontHandle = () => {
     if (!boxFont) {
+      setIndexFont(Math.max(0, SUB_FONT_CHOICES.findIndex((f) => f.value === subFont)));
       setBoxTracks(false);
       setBoxFont(false);
       setBoxDelay(false);
@@ -860,6 +863,7 @@ const Home = (props) => {
   const formatSpeed = (r) => `${_.round(r, 2)}x`;
   const boxSpeedHandle = () => {
     if (!boxSpeed) {
+      setIndexSpeed(Math.max(0, SPEED_OPTIONS.indexOf(state.playbackRate)));
       setBoxTracks(false);
       setBoxFont(false);
       setBoxAudio(false);
@@ -1196,6 +1200,26 @@ const Home = (props) => {
       setIndexAudio(newIndex);
       return;
     }
+    if (boxFont) {
+      if (!action && indexFont === 0) {
+        setBoxFont(false);
+        setIndexFile(0);
+        return;
+      }
+      const n = SUB_FONT_CHOICES.length;
+      setIndexFont(((action ? indexFont + 1 : indexFont - 1) + n) % n);
+      return;
+    }
+    if (boxSpeed) {
+      if (!action && indexSpeed === 0) {
+        setBoxSpeed(false);
+        setIndexFile(0);
+        return;
+      }
+      const n = SPEED_OPTIONS.length;
+      setIndexSpeed(((action ? indexSpeed + 1 : indexSpeed - 1) + n) % n);
+      return;
+    }
     if (!boxTracks) {
       let newIndex = action ? 3 : 0;
       if (indexFile === 0 && !action) {
@@ -1227,8 +1251,8 @@ const Home = (props) => {
       handleChangeSeek(action);
     } else {
       let newIndex = action ? indexFile + 1 : indexFile - 1;
-      if (newIndex < 1) newIndex = 10;
-      if (newIndex > 10) newIndex = 1;
+      if (newIndex < 1) newIndex = 12;
+      if (newIndex > 12) newIndex = 1;
       setIndexFile(newIndex);
     }
   };
@@ -1720,6 +1744,10 @@ const Home = (props) => {
                           document.getElementsByClassName("d-active")[0]?.click();
                         } else if (boxAudio) {
                           document.getElementsByClassName("a-active")[0]?.click();
+                        } else if (boxFont) {
+                          document.getElementsByClassName("fo-active")[0]?.click();
+                        } else if (boxSpeed) {
+                          document.getElementsByClassName("sp-active")[0]?.click();
                         } else if (boxTracks) {
                           document.getElementsByClassName("s-active")[0]?.click();
                         } else {
@@ -2090,7 +2118,7 @@ const Home = (props) => {
                             )}
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_font" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxFontHandle()}>
+                        <div className={`v-subtitle`} id="play_7" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxFontHandle()}>
                           <span className="v-subIcon">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <text x="18" y="24" textAnchor="middle" fontSize="15" fontWeight="600" fill="#fff" fontFamily="Helvetica, Arial, sans-serif">Aa</text>
@@ -2098,9 +2126,9 @@ const Home = (props) => {
                           </span>
                           <div className={`v-subtitlesList ${boxFont ? "v-active" : ""}`}>
                             <ul>
-                              {SUB_FONT_CHOICES.map((f) => (
-                                <li key={f.label} onClick={() => setSubFont(f.value)}>
-                                  <button className={`v-trackButton ${subFont === f.value ? "v-active" : ""}`} style={{ fontFamily: f.value || "Helvetica, Arial, sans-serif" }}>
+                              {SUB_FONT_CHOICES.map((f, fi) => (
+                                <li key={f.label} className={indexFont === fi ? "fo-active" : ""} onClick={() => setSubFont(f.value)}>
+                                  <button className={`v-trackButton ${subFont === f.value ? "v-active" : ""}`} style={{ fontFamily: f.value || '"Varela Round", Helvetica, Arial, sans-serif' }}>
                                     <svg viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
                                       <path d="M5.6 10.6 1.4 6.4 0 7.8l5.6 5.6 12-12L16.2 0z"></path>
                                     </svg>
@@ -2111,7 +2139,7 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_speed" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxSpeedHandle()}>
+                        <div className={`v-subtitle`} id="play_8" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxSpeedHandle()}>
                           <span className="v-subIcon">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <text
@@ -2129,9 +2157,10 @@ const Home = (props) => {
                           </span>
                           <div className={`v-subtitlesList ${boxSpeed ? "v-active" : ""}`}>
                             <ul>
-                              {SPEED_OPTIONS.map((r) => (
+                              {SPEED_OPTIONS.map((r, si) => (
                                 <li
                                   key={`speed_${r}`}
+                                  className={indexSpeed === si ? "sp-active" : ""}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     changeSpeed({ set: r });
@@ -2148,7 +2177,7 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_7" style={isMouse ? { display: "none" } : undefined} onClick={() => boxDelayHandle()}>
+                        <div className={`v-subtitle`} id="play_9" style={isMouse ? { display: "none" } : undefined} onClick={() => boxDelayHandle()}>
                           <span className="v-subIcon">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.isEmpty(subtitles) ? "0.3" : "1"}`}>
                               <path
@@ -2189,7 +2218,7 @@ const Home = (props) => {
                             </ul>
                           </div>
                         </div>
-                        <div className={`v-subtitle`} id="play_8" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxAudioHandle()}>
+                        <div className={`v-subtitle`} id="play_10" style={hideExtraIcons ? { display: "none" } : undefined} onClick={() => boxAudioHandle()}>
                           <span className="v-subIcon">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%" fill-opacity={`${_.size(audioList) > 1 || isMouse ? "1" : "0.3"}`}>
                               <path
@@ -2238,7 +2267,7 @@ const Home = (props) => {
                             )}
                           </div>
                         </div>
-                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_9" style={isMouse ? { display: "none" } : undefined} onClick={() => setStateElm({ muted: !state.muted })}>
+                        <div className={`v-volume ${state.muted ? "v-muted" : ""}`} id="play_11" style={isMouse ? { display: "none" } : undefined} onClick={() => setStateElm({ muted: !state.muted })}>
                           <span className="v-playerIcon v-iconVolumeHigh">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <path
@@ -2259,7 +2288,7 @@ const Home = (props) => {
                             </svg>
                           </span>
                         </div>
-                        <div className={`v-fullscreen ${isFullSreen ? "v-exit" : ""}`} id="play_10" onClick={() => handleFullSreen(!isFullSreen)}>
+                        <div className={`v-fullscreen ${isFullSreen ? "v-exit" : ""}`} id="play_12" onClick={() => handleFullSreen(!isFullSreen)}>
                           <span className="v-playerIcon v-iconFullscreen">
                             <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
                               <g className="ytp-fullscreen-button-corner-0">

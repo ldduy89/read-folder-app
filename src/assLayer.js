@@ -5,14 +5,13 @@ const H_ALIGN = ["left", "center", "right"];
 const TEXT_BOX = "#000"; // nền chữ đen đặc (đổi thành "transparent" nếu muốn bỏ nền)
 
 // Font phụ đề (khai báo @font-face trong App.css)
-const SUB_FONT = 'Helvetica, Arial, "Open Sans", sans-serif'; // font phụ đề trên video
+const SUB_FONT = '"Varela Round", Helvetica, Arial, sans-serif'; // font phụ đề mặc định
 // true: mọi sub dùng font trên; false: sub ASS nào khai báo font riêng thì dùng font đó, font trên chỉ là dự phòng
 const SUB_FONT_FORCE = true;
 // Font người dùng chọn cho sub trên video (rỗng = SUB_FONT mặc định)
 export const SUB_FONT_CHOICES = [
-  { value: "", label: "Mặc định (Helvetica)" },
+  { value: "", label: "Mặc định (Varela Round)" },
   { value: '"UVN La Xanh", Tahoma, sans-serif', label: "Lá xanh" },
-  { value: '"Varela Round", sans-serif', label: "Varela Round" },
   { value: '"Open Sans", sans-serif', label: "Open Sans" },
   { value: "Tahoma, Verdana, sans-serif", label: "Tahoma" },
   { value: "Arial, sans-serif", label: "Arial" },
