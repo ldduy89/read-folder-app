@@ -4,6 +4,7 @@ import fileIcon from "./file.png";
 import folderIcon from "./folder.png";
 import "./App.css";
 import ReactPlayer from "react-player";
+import { getResume, setResume, clearResume, pruneResumeInFolder, RESUME_MAX_FRACTION } from "./resumePosition";
 import _ from "lodash";
 import Duration from "./Duration";
 import { plainCueText } from "./assText";
@@ -287,6 +288,7 @@ const Home = (props) => {
   const toastRef = useRef(null);
   const [mediaSrc, setMediaSrc] = useState(null); // null = file gốc; có giá trị = file đã remux (video + audio đã chọn)
   const resumeAtRef = useRef(null); // vị trí cần tua tới sau khi đổi nguồn video
+  const resumeReadyRef = useRef(false); // đã khôi phục xong vị trí của file hiện tại (trước đó không lưu vị trí)
   const audioTokenRef = useRef(0);
   const prepTimerRef = useRef(null); // đếm giây khi đang tách audio // huỷ polling cũ khi chọn audio khác / đổi file
   const audioTargetRef = useRef(null); // audio đang được chọn (kể cả khi đang tách)
@@ -362,6 +364,9 @@ const Home = (props) => {
     setBoxFont(false);
     stopExternalAudio();
     setAudioList([]);
+    // Vào video: tua tới vị trí đã lưu (nếu có). Đặt sau stopExternalAudio() vì hàm đó xoá resumeAtRef
+    resumeReadyRef.current = false;
+    resumeAtRef.current = type === "file" ? getResume(pathViewFile) : null;
     if (type !== "file") {
       fetch(publicURL + fullPathRoot.join("/"))
         .then((response) => response.json())
@@ -371,7 +376,12 @@ const Home = (props) => {
       getAudioList();
       fetch(publicURL + backRootPath)
         .then((response) => response.json())
-        .then((data) => setFilesOfParent(data.filter((d) => d.type === "file")));
+        .then((data) => {
+          const files = data.filter((d) => d.type === "file");
+          setFilesOfParent(files);
+          // Vào thư mục: xoá vị trí đã lưu của các video không còn trong thư mục
+          pruneResumeInFolder(backRootPath, files.map((f) => f.name));
+        });
     }
     window.addEventListener("fullscreenchange", onFullSreenEvent);
     window.history.pushState(null, null, window.location.pathname + window.location.search);
@@ -1005,7 +1015,12 @@ const Home = (props) => {
   };
 
   const handleActionFile = (fileName, path) => {
-    if (fileName) history.replace(`/${[path, fileName].join("/")}?type=file`);
+    if (fileName) {
+      // Chuyển sang video khác bằng nút tới/lui (hoặc hết video): bỏ vị trí đã lưu của video đang xem
+      resumeReadyRef.current = false;
+      clearResume(pathViewFile);
+      history.replace(`/${[path, fileName].join("/")}?type=file`);
+    }
   };
 
   // Theo dõi kích thước khung video (đổi cỡ cửa sổ, vào/ra toàn màn hình) để chữ phụ đề co giãn theo
@@ -1882,10 +1897,17 @@ const Home = (props) => {
                             playerRef.current.seekTo(resumeAtRef.current, "seconds");
                             resumeAtRef.current = null;
                           }
+                          resumeReadyRef.current = true;
                         }}
                         onDuration={(duration) => setStateElm({ duration: duration })}
                         onEnded={() => handleActionFile(nextFile, backRootPath)}
-                        onProgress={(stage) => setStateElm({ played: stage.played })}
+                        onProgress={(stage) => {
+                          setStateElm({ played: stage.played });
+                          // Chỉ lưu khi đã tua xong vị trí cũ, tránh ghi đè bằng số 0
+                          if (!resumeReadyRef.current || resumeAtRef.current !== null) return;
+                          if (stage.played >= RESUME_MAX_FRACTION) clearResume(pathViewFile);
+                          else if (stage.playedSeconds > 0) setResume(pathViewFile, stage.playedSeconds);
+                        }}
                         config={{
                           attributes: {
                             crossOrigin: "anonymous"
