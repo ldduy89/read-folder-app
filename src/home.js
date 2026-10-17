@@ -208,6 +208,8 @@ const Home = (props) => {
   const stacked = isMouse && !fsSide && (view.h > view.w || view.w < 640);
   // Chế độ chỉ nghe tiếng: ẩn hình (video vẫn chạy), khung phụ đề chiếm chỗ của video, bấm vào chữ để tô đen / dịch
   const [audioOnly, setAudioOnly] = useState(false);
+  // Video phủ toàn bộ cửa sổ trình duyệt (ẩn tiêu đề và khung sub)
+  const [browserFull, setBrowserFull] = useState(false);
   const [subFont, setSubFont] = useState(() => {
     try {
       return localStorage.getItem("subFontChoice") || "";
@@ -267,6 +269,13 @@ const Home = (props) => {
   }, [touch]);
   // Độ rộng thật của khung chứa video + phụ đề (đo lại khi xoay màn hình / đổi kích thước)
   const stackRef = useRef(null);
+  // Chiều cao còn lại từ đầu khối video xuống đáy màn hình: video và khung sub căng hết trang
+  const [stackTop, setStackTop] = useState(0);
+  useLayoutEffect(() => {
+    const el = stackRef.current;
+    if (el) setStackTop(Math.round(el.getBoundingClientRect().top + window.scrollY));
+  }, [view.w, view.h, layoutStacked, fsSide, audioOnly, type, pathViewFile]);
+  const fillH = Math.max(view.h - stackTop - 24, 360) + "px";
   const [stackW, setStackW] = useState(0);
   useEffect(() => {
     const el = stackRef.current;
@@ -365,6 +374,7 @@ const Home = (props) => {
     stopExternalAudio();
     setAudioList([]);
     // Vào video: tua tới vị trí đã lưu (nếu có). Đặt sau stopExternalAudio() vì hàm đó xoá resumeAtRef
+    setBrowserFull(false);
     resumeReadyRef.current = false;
     resumeAtRef.current = type === "file" ? getResume(pathViewFile) : null;
     if (type !== "file") {
@@ -1135,6 +1145,7 @@ const Home = (props) => {
 
   const toggleAudioOnly = () => {
     if (!audioOnly && isFullSreen) handleFullSreen(false); // đang full screen thì thoát trước khi ẩn hình
+    setBrowserFull(false);
     setAudioOnly(!audioOnly);
   };
 
@@ -1514,6 +1525,11 @@ const Home = (props) => {
             break;
           case "Escape":
           case "Backspace":
+            if (browserFull) {
+              e.preventDefault();
+              setBrowserFull(false);
+              break;
+            }
             // Đang full screen thì Esc do trình duyệt xử lý (thoát full screen); lần sau mới quay về danh sách
             if (!document.fullscreenElement) {
               e.preventDefault();
@@ -1725,6 +1741,19 @@ const Home = (props) => {
               </div>
               {isMouse && (
                 <div className="ml-auto flex flex-wrap justify-end gap-2 shrink-0 min-w-0 max-w-full compact:gap-1.5">
+                  {type === "file" && !audioOnly && (
+                    <button
+                      type="button"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full bg-transparent font-[inherit] text-white cursor-pointer ${browserFull ? "!border-[#ffd700] !bg-[rgba(255,215,0,0.2)]" : ""}`}
+                      onClick={() => setBrowserFull(!browserFull)}
+                      aria-pressed={browserFull}
+                      title={browserFull ? "Thoát toàn trình duyệt (Esc)" : "Phóng video toàn trình duyệt"}
+                      aria-label={browserFull ? "Thoát toàn trình duyệt" : "Toàn trình duyệt"}
+                    >
+                      <FullscreenIcon width="16" height="16" />
+                      <span className="compact:hidden">{browserFull ? "Thoát toàn trình duyệt" : "Toàn trình duyệt"}</span>
+                    </button>
+                  )}
                   {type === "file" && (
                     <button
                       type="button"
@@ -1831,14 +1860,16 @@ const Home = (props) => {
                 <div
                   className="player-wrapper"
                   style={
-                    isMouse
+                    browserFull && isMouse && !audioOnly
+                      ? { position: "fixed", inset: 0, width: "100vw", height: "100vh", zIndex: 40, background: "#000" }
+                      : isMouse
                       ? fsSide
                         ? { height: "100%", flex: 1, minWidth: 0 }
                         : audioOnly
                           ? { width: "100%", height: 0, overflow: "hidden", marginBottom: "-12px" } // chỉ nghe: ẩn hẳn cả khung video lẫn thanh điều khiển (video vẫn chạy); -12px bù khoảng cách giữa hai khối xếp dọc
                           : stacked
                             ? { width: "100%", height: Math.round((bodyW * 9) / 16) + "px" } // video 16:9 chiếm hết bề ngang
-                            : { height: "80vh", flex: 1, minWidth: 0 }
+                            : { height: fillH, flex: 1, minWidth: 0 }
                       : undefined
                   }
                 >
@@ -2445,7 +2476,8 @@ const Home = (props) => {
                       WebkitUserSelect: audioOnly ? "text" : undefined,
                       width: fsSide ? "max(200px, 25vw)" : layoutStacked ? "100%" : "min(360px, 40vw)",
                       flexShrink: 0,
-                      height: fsSide ? "100%" : audioOnly ? "max(240px, calc(100vh - 130px))" : stacked ? "50vh" : "80vh", // chỉ nghe: khung sub chiếm gần hết phần còn lại của màn hình
+                      display: browserFull && isMouse ? "none" : undefined,
+                      height: fsSide ? "100%" : audioOnly ? "max(240px, calc(100vh - 130px))" : stacked ? "50vh" : fillH, // chỉ nghe: khung sub chiếm gần hết phần còn lại của màn hình
                       maxWidth: audioOnly ? "900px" : undefined,
                       alignSelf: audioOnly ? "center" : undefined,
                       overflowY: "auto",
