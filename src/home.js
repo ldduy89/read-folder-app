@@ -2042,14 +2042,15 @@ const Home = (props) => {
                           <Duration seconds={state.duration}></Duration>
                         </span>
                       )}
-                      {isMouse && (
+                      {isMouse && !audioOnly && (
                         <button
                           type="button"
-                          title={audioOnly ? "Hiện video (V)" : "Chỉ nghe tiếng, ẩn video (V)"}
-                          aria-pressed={audioOnly}
+                          title={browserFull ? "Thoát toàn trình duyệt (Esc)" : "Phóng video toàn trình duyệt"}
+                          aria-label={browserFull ? "Thoát toàn trình duyệt" : "Toàn trình duyệt"}
+                          aria-pressed={browserFull}
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleAudioOnly();
+                            setBrowserFull(!browserFull);
                           }}
                           style={{
                             flexShrink: 0,
@@ -2059,18 +2060,16 @@ const Home = (props) => {
                             height: Math.round(titlePx * 1.9) + "px",
                             padding: 0,
                             borderRadius: "50%",
-                            border: "1px solid " + (audioOnly ? "#ffd700" : "rgba(255,255,255,0.5)"),
-                            background: audioOnly ? "rgba(255,215,0,0.25)" : "rgba(255,255,255,0.15)",
+                            border: "1px solid " + (browserFull ? "#ffd700" : "rgba(255,255,255,0.5)"),
+                            background: browserFull ? "rgba(255,215,0,0.25)" : "rgba(255,255,255,0.15)",
                             cursor: "pointer",
                             pointerEvents: hideUI ? "none" : "auto"
                           }}
                         >
-                          {audioOnly ? (
-                            // đang chỉ nghe: biểu tượng máy quay = bấm để hiện lại video
-                            <CameraIcon width="70%" height="70%" fill="#fff" />
+                          {browserFull ? (
+                            <FullscreenExitIcon width="60%" height="60%" fill="#fff" />
                           ) : (
-                            // tai nghe = bấm để chỉ nghe tiếng
-                            <HeadphoneIcon width="70%" height="70%" fill="#fff" />
+                            <FullscreenIcon width="60%" height="60%" fill="#fff" />
                           )}
                         </button>
                       )}
