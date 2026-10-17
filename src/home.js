@@ -1139,7 +1139,7 @@ const Home = (props) => {
     "--font-size": sizeW ? Math.round(Math.min(Math.max(sizeW / 90, touch ? 13 : 11), 26)) + "px" : "12px",
     // Chiều cao tối đa của popup chọn (sub / tốc độ / audio): không cao quá khung video (chỉ nghe: khung rất thấp nên cho tối đa 230px, popup mở lên trên)
     "--menu-max-h": audioOnly ? "230px" : videoH ? Math.max(videoH - barPx - 16, 80) + "px" : "70vh",
-    "--font-size-subtitle": videoH ? Math.max(videoH / 18, 14) + "px" : "24px",
+    "--font-size-subtitle": videoW ? Math.max(videoW / 32, 14) + "px" : "24px",
     // Tiêu đề video co giãn theo độ rộng khung video
     "--font-size-title": titlePx + "px"
   };
