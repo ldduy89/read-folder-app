@@ -52,6 +52,7 @@ import {
   VolumeUpIcon
 } from "./icons";
 import { Link, useHistory } from "react-router-dom";
+import { HiArrowsPointingIn, HiArrowsPointingOut } from "react-icons/hi2";
 
 // Xoay màn hình theo toàn màn hình (điện thoại / máy tính bảng): vào full -> khoá ngang, thoát -> khoá dọc rồi trả lại tự xoay.
 // Chỉ chạy ở trình duyệt có screen.orientation.lock (Chrome / Firefox Android); iPhone không hỗ trợ nên bỏ qua êm.
@@ -1750,7 +1751,7 @@ const Home = (props) => {
                       title={browserFull ? "Thoát toàn trình duyệt (Esc)" : "Phóng video toàn trình duyệt"}
                       aria-label={browserFull ? "Thoát toàn trình duyệt" : "Toàn trình duyệt"}
                     >
-                      <FullscreenIcon width="16" height="16" />
+                      {browserFull ? <HiArrowsPointingIn size="16" /> : <HiArrowsPointingOut size="16" />}
                       <span className="compact:hidden">{browserFull ? "Thoát toàn trình duyệt" : "Toàn trình duyệt"}</span>
                     </button>
                   )}
@@ -2067,9 +2068,9 @@ const Home = (props) => {
                           }}
                         >
                           {browserFull ? (
-                            <FullscreenExitIcon width="60%" height="60%" fill="#fff" />
+                            <HiArrowsPointingIn size="60%" fill="#fff" />
                           ) : (
-                            <FullscreenIcon width="60%" height="60%" fill="#fff" />
+                            <HiArrowsPointingOut size="60%" fill="#fff" />
                           )}
                         </button>
                       )}

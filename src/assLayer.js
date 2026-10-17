@@ -23,11 +23,13 @@ let subFontFamily = SUB_FONT;
 export const setSubFontFamily = (choice) => {
   subFontFamily = choice || SUB_FONT;
 };
-// Font Lá xanh và Open Sans dùng line-height 1.44, các font còn lại dùng 1.2 (để dòng sát nhau mà không che dấu)
+// Font Lá xanh và Open Sans dùng line-height 1.44, Arial/Georgia/Times 1.16, Varela Round và font khác 1.26
+// Chỉ xét font chính (phần trước dấu phẩy), không xét font dự phòng: chuỗi mặc định có "Arial" ở sau
 const subLineHeight = () => {
-  if (/UVN La Xanh|Open Sans/.test(subFontFamily)) return SUB_LINE_HEIGHT; // 1.44
-  if (/Arial|Georgia|Times New Roman/.test(subFontFamily)) return 1.16;
-  return 1.26;
+  const primary = subFontFamily.split(",")[0];
+  if (/UVN La Xanh|Open Sans/.test(primary)) return SUB_LINE_HEIGHT; // 1.44
+  if (/Arial|Georgia|Times New Roman/.test(primary)) return 1.16;
+  return 1.26; // Varela Round và các font khác
 };
 // Màu chữ sub: màu mặc định của app (DEFAULT_ASS_STYLE.primary, vàng) thay cho màu khai báo trong file sub (có sub chọn màu khó nhìn)
 const SUB_COLOR = DEFAULT_ASS_STYLE.primary;
