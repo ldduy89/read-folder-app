@@ -42,7 +42,7 @@ const SUB_COLOR_FORCE = true;
 const SUB_LINE_HEIGHT = 1.44; // line-height cho font Lá xanh và Open Sans
 
 // Cỡ chữ sub tối đa theo tỉ lệ chiều cao hình video (mặc định khi file sub không đặt cỡ là 1/18 ≈ 0.056). Hạ số này nếu chữ vẫn to, tăng nếu muốn cho phép to hơn.
-const SUB_FONT_MAX_RATIO = 1 / 32; // trần theo CHIỀU RỘNG hình = đúng cỡ mặc định khi sub không đặt size (resX / 32 ≈ resY / 18 với 16:9)
+const SUB_FONT_MAX_RATIO = 1 / 36; // trần theo CHIỀU RỘNG hình = đúng cỡ mặc định khi sub không đặt size (resX / 32 ≈ resY / 18 với 16:9)
 const SUB_VOLUME_CHARS = 130; // số ký tự tối đa của một cue trước khi bắt đầu thu nhỏ chữ (chỉnh nếu thấy vừa / quá nhỏ)
 const SUB_MIN_VOLUME_SCALE = 0.5; // thu nhỏ tối đa còn 50%
 
@@ -71,7 +71,7 @@ const segStyle = (seg, sx, resX, wrap, scale = 1) => ({
   touchAction: "none", // không để trình duyệt tự cuộn / vuốt khi người dùng quẹt ngang trên chữ sub
   fontFamily: SUB_FONT_FORCE || !seg.font ? subFontFamily : `"${seg.font}", ${subFontFamily}`,
   // Chặn chữ sub quá to: file sub đặt cỡ chữ lớn thì cũng không vượt SUB_FONT_MAX_RATIO chiều cao hình (resY * sy = chiều cao hình)
-  fontSize: Math.min(Math.max((seg.fs || resX / 32) * sx * scale, 8), Math.max(resX * sx * SUB_FONT_MAX_RATIO, 8)) + "px",
+  fontSize: Math.min(Math.max((seg.fs || resX / 36) * sx * scale, 8), Math.max(resX * sx * SUB_FONT_MAX_RATIO, 8)) + "px",
   fontWeight: 600, // độ đậm chữ phụ đề (ghi đè cả khi file sub đặt in đậm)
   fontStyle: seg.italic ? "italic" : "normal",
   textDecoration: [seg.underline && "underline", seg.strike && "line-through"].filter(Boolean).join(" ") || "none",
