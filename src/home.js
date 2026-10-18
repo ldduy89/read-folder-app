@@ -120,6 +120,9 @@ const Home = (props) => {
     })(),
     loop: false
   };
+const renderCountRef = useRef(0);
+renderCountRef.current += 1;
+console.log("render", renderCountRef.current);
 
   const [folders, setFolders] = useState([]);
   const [filesOfParent, setFilesOfParent] = useState([]);
@@ -307,10 +310,16 @@ const Home = (props) => {
   const popupRef = useRef({ trWord: false, boxTracks: false, boxAudio: false, boxSpeed: false, boxDelay: false, boxFont: false });
   popupRef.current = { trWord: !!trWord, boxTracks, boxAudio, boxSpeed, boxDelay, boxFont };
 
+  // Track đang được trình duyệt vẽ (::cue, chỉ TV). Mọi chỗ đặt track.mode đều tôn trọng ref này.
+  const nativeTrackRef = useRef(null);
+  const playedRef = useRef(0); // tiến trình hiện tại, đọc trực tiếp cho tua (không đợi state)
+  const lastProgressSecRef = useRef(-1);
+  // Đưa mode về đúng: chỉ track native được showing, các track còn lại hidden
+  const trackModeFor = (track) => (track && track === nativeTrackRef.current ? "showing" : "hidden");
+
   if (!_.isEmpty(textTracks) && !_.isEmpty(subtitles)) {
-    const subtitle = subtitles.find((s) => s.default);
     for (const element of textTracks) {
-      element.mode = "hidden"; // phụ đề tự vẽ bằng overlay (nền đen đặc)
+      element.mode = trackModeFor(element); // phụ đề JS vẽ bằng overlay (nền đen đặc), ngoại trừ track ::cue trên TV
     }
   }
 
@@ -613,7 +622,7 @@ const Home = (props) => {
   const changeSubtitle = (language, noSetSub) => {
     if (textTracks && textTracks.length > 0) {
       for (const element of textTracks) {
-        element.mode = "hidden";
+        element.mode = trackModeFor(element);
       }
     }
     const newSybtitle = _.clone(subtitles);
@@ -735,7 +744,7 @@ const Home = (props) => {
       const videoEl = document.getElementsByTagName("video")[0];
       track = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks).find((t) => t.language === activeSubLang) : null;
       if (track) {
-        track.mode = "hidden";
+        track.mode = trackModeFor(track);
         track.addEventListener("cuechange", onCueChange);
         onCueChange();
       } else if (tries++ < 120) {
@@ -872,12 +881,14 @@ const Home = (props) => {
         return;
       }
       native = !trackHasPos(track);
-      track.mode = native ? "showing" : "hidden";
+      nativeTrackRef.current = native ? track : null;
+      track.mode = trackModeFor(track);
       setNativeSub(native);
     };
     check();
     return () => {
       clearTimeout(timer);
+      if (native) nativeTrackRef.current = null;
       if (track && native) track.mode = "hidden"; // tắt sub / đổi sub: không để ::cue còn vẽ
       setNativeSub(false);
     };
@@ -1163,9 +1174,20 @@ const Home = (props) => {
     // Video có thể được tạo sau: chỉ poll cho tới khi thấy thẻ video, rồi nghe loadedmetadata (đổi độ phân giải) thay vì poll mãi
     let vid = null;
     let pollId = null;
+    let ro = null;
+    const frameEl = () => document.getElementById("sample_video");
+    const observe = () => {
+      if (!ro) return;
+      const f = frameEl();
+      if (f) ro.observe(f); // khung đổi kích thước (cửa sổ, panel bên cạnh, toàn màn hình) -> đo lại vùng hình
+      if (vid) ro.observe(vid);
+    };
+    const hasRO = typeof ResizeObserver !== "undefined";
+    if (hasRO) ro = new ResizeObserver(() => calc());
     const attachVideo = () => {
       vid = document.getElementsByTagName("video")[0] || null;
       if (vid) vid.addEventListener("loadedmetadata", calc);
+      observe();
       return !!vid;
     };
     if (!attachVideo()) {
@@ -1177,11 +1199,13 @@ const Home = (props) => {
         }
       }, 500);
     }
-    window.addEventListener("resize", calc);
+    // Fallback cho trình duyệt TV cũ không có ResizeObserver
+    if (!hasRO) window.addEventListener("resize", calc);
     return () => {
       clearInterval(pollId);
+      if (ro) ro.disconnect();
       if (vid) vid.removeEventListener("loadedmetadata", calc);
-      window.removeEventListener("resize", calc);
+      if (!hasRO) window.removeEventListener("resize", calc);
     };
   }, [frameW, frameH, pathViewFile]);
 
@@ -1251,6 +1275,7 @@ const Home = (props) => {
   };
 
   const setStateElm = (value) => {
+    if (value && "played" in value) playedRef.current = value.played;
     setState((prev) => ({ ...prev, ...value })); // state phẳng: không cần cloneDeep mỗi lần onProgress
   };
 
@@ -1271,7 +1296,7 @@ const Home = (props) => {
   };
 
   const handleSeekMouseDown = () => {
-    setStateElm({ seeking: true, seekingLine: state.played });
+    setStateElm({ seeking: true, seekingLine: playedRef.current });
   };
 
   const handleSeekChange = (e) => {
@@ -1285,7 +1310,7 @@ const Home = (props) => {
   };
 
   const handleChangeSeek = (isNext, seconds) => {
-    let newSeconds = parseFloat(state.played * state.duration) + (isNext ? seconds || 15 : -(seconds || 15));
+    let newSeconds = parseFloat(playedRef.current * state.duration) + (isNext ? seconds || 15 : -(seconds || 15));
     newSeconds = newSeconds > 0 ? newSeconds : 0;
     setStateElm({ played: newSeconds / state.duration, playing: true }); // tua xong thì phát luôn nếu đang dừng
     playerRef.current?.seekTo(newSeconds, "seconds");
@@ -2025,7 +2050,13 @@ const Home = (props) => {
                         onDuration={(duration) => setStateElm({ duration: duration })}
                         onEnded={() => handleActionFile(nextFile, backRootPath)}
                         onProgress={(stage) => {
-                          setStateElm({ played: stage.played });
+                          const sec = Math.floor(stage.playedSeconds || 0);
+                          if (sec !== lastProgressSecRef.current) {
+                            lastProgressSecRef.current = sec;
+                            setStateElm({ played: stage.played }); // thanh tiến trình cập nhật mỗi giây, không mỗi tick
+                          } else {
+                            playedRef.current = stage.played;
+                          }
                           // Chỉ lưu khi đã tua xong vị trí cũ, tránh ghi đè bằng số 0
                           if (!resumeReadyRef.current || resumeAtRef.current !== null) return;
                           if (stage.played >= RESUME_MAX_FRACTION) clearResume(pathViewFile);
