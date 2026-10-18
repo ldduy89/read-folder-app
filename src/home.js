@@ -54,6 +54,44 @@ import {
 import { Link, useHistory } from "react-router-dom";
 import { HiArrowsPointingIn, HiArrowsPointingOut } from "react-icons/hi2";
 
+// Vị trí phát tách khỏi state của Home: chỉ các thành phần hiển thị thời gian đăng ký vào đây,
+// nên mỗi lần tiến trình đổi không làm Home render lại (kéo theo cả giao diện).
+const playbackStore = {
+  played: 0,
+  listeners: new Set(),
+  set(v) {
+    this.played = v;
+    this.listeners.forEach((fn) => fn(v));
+  },
+  subscribe(fn) {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  },
+};
+
+// Khi thanh điều khiển đang ẩn thì không cập nhật; hiện lại thì đồng bộ một lần với vị trí hiện tại.
+function usePlayedPosition(hidden) {
+  const [played, setPlayed] = useState(playbackStore.played);
+  const hiddenRef = useRef(hidden);
+  hiddenRef.current = hidden;
+  useEffect(() => playbackStore.subscribe((v) => { if (!hiddenRef.current) setPlayed(v); }), []);
+  useEffect(() => {
+    if (!hidden) setPlayed(playbackStore.played);
+  }, [hidden]);
+  return played;
+}
+
+function ProgressSeek({ seeking, seekingLine, hidden }) {
+  const played = usePlayedPosition(hidden);
+  return <div className="v-progressSeek" style={{ width: `${(seeking ? seekingLine : played) * 100}%` }}></div>;
+}
+
+function CurrentTime({ duration, seeking, seekingLine, hidden }) {
+  const played = usePlayedPosition(hidden);
+  return <Duration seconds={duration * (seeking ? seekingLine : played)}></Duration>;
+}
+
+
 // Xoay màn hình theo toàn màn hình (điện thoại / máy tính bảng): vào full -> khoá ngang, thoát -> khoá dọc rồi trả lại tự xoay.
 // Chỉ chạy ở trình duyệt có screen.orientation.lock (Chrome / Firefox Android); iPhone không hỗ trợ nên bỏ qua êm.
 const orient = () => (typeof window !== "undefined" && window.screen && window.screen.orientation) || null;
@@ -1298,21 +1336,15 @@ const Home = (props) => {
   };
 
   const setStateElm = (value) => {
-    if (value && "played" in value) playedRef.current = value.played;
+    if (value && "played" in value) {
+      playedRef.current = value.played;
+      playbackStore.set(value.played);
+    }
     setState((prev) => ({ ...prev, ...value })); // state phẳng: không cần cloneDeep mỗi lần onProgress
   };
 
   setStateElmRef.current = setStateElm;
 
-  // Thanh điều khiển vừa hiện lại: đồng bộ thanh tiến trình với vị trí hiện tại
-  const prevHideUIRef = useRef(hideUI);
-  useEffect(() => {
-    if (prevHideUIRef.current && !hideUI) {
-      lastProgressSecRef.current = -1;
-      setStateElm({ played: playedRef.current });
-    }
-    prevHideUIRef.current = hideUI;
-  }, [hideUI]);
 
   const handleFullSreen = (isFullSreen) => {
     if (isFullSreen) {
@@ -2083,15 +2115,8 @@ const Home = (props) => {
                         onDuration={(duration) => setStateElm({ duration: duration })}
                         onEnded={() => handleActionFile(nextFile, backRootPath)}
                         onProgress={(stage) => {
-                          const sec = Math.floor(stage.playedSeconds || 0);
-                          if (hideUI) {
-                            playedRef.current = stage.played; // thanh điều khiển đang ẩn: không cập nhật state, chỉ giữ giá trị
-                          } else if (sec !== lastProgressSecRef.current) {
-                            lastProgressSecRef.current = sec;
-                            setStateElm({ played: stage.played }); // thanh tiến trình cập nhật mỗi giây, không mỗi tick
-                          } else {
-                            playedRef.current = stage.played;
-                          }
+                          playedRef.current = stage.played;
+                          playbackStore.set(stage.played); // chỉ thành phần hiển thị thời gian nhận, Home không render lại
                           // Chỉ lưu khi đã tua xong vị trí cũ, tránh ghi đè bằng số 0
                           if (!resumeReadyRef.current || resumeAtRef.current !== null) return;
                           if (stage.played >= RESUME_MAX_FRACTION) clearResume(pathViewFile);
@@ -2190,7 +2215,7 @@ const Home = (props) => {
                       </span>
                       {compactTouch && (
                         <span className="v-topTime shrink-0 whitespace-nowrap !text-[calc(var(--font-size-title,24px)*0.85)]">
-                          <Duration seconds={state.duration * (state.seeking ? state.seekingLine : state.played)}></Duration>
+                          <CurrentTime duration={state.duration} seeking={state.seeking} seekingLine={state.seekingLine} hidden={hideUI} />
                           &nbsp;/&nbsp;
                           <Duration seconds={state.duration}></Duration>
                         </span>
@@ -2265,7 +2290,7 @@ const Home = (props) => {
                     </button>
                     <div className={`v-controlBar ${hideUI ? "ui-hidden" : ""}`}>
                       <div className="v-progressBar" id="play_0">
-                        <div className="v-progressSeek" style={{ width: `${(state.seeking ? state.seekingLine : state.played) * 100}%` }}></div>
+                        <ProgressSeek seeking={state.seeking} seekingLine={state.seekingLine} hidden={hideUI} />
                         <input
                           onMouseDown={handleSeekMouseDown}
                           onChange={handleSeekChange}
@@ -2326,7 +2351,7 @@ const Home = (props) => {
                           style={compactTouch ? { display: "none" } : undefined}
                         >
                           <span className="v-currentTime">
-                            <Duration seconds={state.duration * (state.seeking ? state.seekingLine : state.played)}></Duration>
+                            <CurrentTime duration={state.duration} seeking={state.seeking} seekingLine={state.seekingLine} hidden={hideUI} />
                           </span>
                           &nbsp;/&nbsp;
                           <span className="v-duration">
