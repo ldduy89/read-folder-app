@@ -54,13 +54,6 @@ import {
 import { Link, useHistory } from "react-router-dom";
 import { HiArrowsPointingIn, HiArrowsPointingOut } from "react-icons/hi2";
 
-// ---- DEBUG: đếm số lần chạy của từng nguồn. Gõ window.__dbg trong console để xem.
-const dbg = (name) => {
-  if (!window.__dbg) window.__dbg = {};
-  window.__dbg[name] = (window.__dbg[name] || 0) + 1;
-};
-
-
 // Xoay màn hình theo toàn màn hình (điện thoại / máy tính bảng): vào full -> khoá ngang, thoát -> khoá dọc rồi trả lại tự xoay.
 // Chỉ chạy ở trình duyệt có screen.orientation.lock (Chrome / Firefox Android); iPhone không hỗ trợ nên bỏ qua êm.
 const orient = () => (typeof window !== "undefined" && window.screen && window.screen.orientation) || null;
@@ -128,7 +121,6 @@ const Home = (props) => {
     loop: false
   };
 
-  dbg("render");
   const [folders, setFolders] = useState([]);
   const [filesOfParent, setFilesOfParent] = useState([]);
   const [subtitles, setSubtitles] = useState(null);
@@ -708,6 +700,10 @@ const Home = (props) => {
   cueIndexRef.current = cueIndex;
   const gapRef = useRef(null);
   gapRef.current = gap;
+  // Khung danh sách cue (có ô tiến độ khoảng trống, dòng đang phát) chỉ hiện trên PC hoặc khi chỉ nghe.
+  // Trên TV (đang xem hình) khung này không được render, nên không cần cập nhật cueIndex / gap.
+  const panelVisibleRef = useRef(false);
+  panelVisibleRef.current = isMouse || audioOnly;
   const [loopIndex, setLoopIndex] = useState(-1); // cue đang bật lặp lại (-1: tắt)
   const loopWaitRef = useRef(false); // khoá ngắn sau mỗi lần tua lặp
   const loopTimerRef = useRef(null);
@@ -746,7 +742,6 @@ const Home = (props) => {
     let tries = 0;
     let track = null;
     const onCueChange = () => {
-      dbg("cueChange");
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
       const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: c.text || "" }));
       setLiveCues((prev) => (sameCues(prev, next) ? prev : next));
@@ -793,7 +788,6 @@ const Home = (props) => {
     let tries = 0;
     let track = null;
     const onCueChange = () => {
-      dbg("cueChange");
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
       const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, text: c.text || "" }));
       setLiveCues2((prev) => (sameCues(prev, next) ? prev : next));
@@ -912,7 +906,6 @@ const Home = (props) => {
     const id = setInterval(() => {
       const player = playerRef.current;
       if (!player) return;
-      dbg("cueTick");
       const t = player.getCurrentTime() || 0;
       let lo = 0;
       let hi = cueList.length - 1;
@@ -927,7 +920,8 @@ const Home = (props) => {
         }
       }
       const live = found >= 0 && t < cueList[found].end ? found : -1;
-      if (live !== cueIndexRef.current) {
+      const panelOn = panelVisibleRef.current;
+      if (panelOn && live !== cueIndexRef.current) {
         cueIndexRef.current = live;
         setCueIndex(live);
       }
@@ -947,7 +941,9 @@ const Home = (props) => {
       // Khi chỉ đổi tỉ lệ (p đổi mỗi 1%) thì cập nhật thẳng vào DOM, không render lại cả component.
       const prevNext = gapRef.current ? gapRef.current.next : null;
       const nowNext = nextGap ? nextGap.next : null;
-      if (prevNext !== nowNext) {
+      if (!panelOn) {
+        // không có khung danh sách trên TV: bỏ qua
+      } else if (prevNext !== nowNext) {
         gapRef.current = nextGap;
         setGap(nextGap);
       } else if (nextGap) {
@@ -997,7 +993,7 @@ const Home = (props) => {
       const player = playerRef.current;
       if (!cue || !player) return;
       if (Date.now() - loopSinceRef.current < 800) return; // chờ lệnh tua ban đầu có hiệu lực
-      dbg("loopTick"); const t = player.getCurrentTime() || 0;
+      const t = player.getCurrentTime() || 0;
       if (t < cue.start - 0.5 || t > cue.end + 0.5) {
         setLoopIndex(-1); // người dùng tua ra ngoài câu -> tắt lặp
         return;
@@ -1302,7 +1298,6 @@ const Home = (props) => {
   };
 
   const setStateElm = (value) => {
-    dbg("setStateElm");
     if (value && "played" in value) playedRef.current = value.played;
     setState((prev) => ({ ...prev, ...value })); // state phẳng: không cần cloneDeep mỗi lần onProgress
   };
@@ -2088,7 +2083,6 @@ const Home = (props) => {
                         onDuration={(duration) => setStateElm({ duration: duration })}
                         onEnded={() => handleActionFile(nextFile, backRootPath)}
                         onProgress={(stage) => {
-                          dbg("progress");
                           const sec = Math.floor(stage.playedSeconds || 0);
                           if (hideUI) {
                             playedRef.current = stage.played; // thanh điều khiển đang ẩn: không cập nhật state, chỉ giữ giá trị
