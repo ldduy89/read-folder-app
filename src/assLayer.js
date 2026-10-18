@@ -42,7 +42,7 @@ const SUB_COLOR_FORCE = true;
 const SUB_LINE_HEIGHT = 1.44; // line-height cho font Lá xanh và Open Sans
 
 // Cỡ chữ sub tối đa theo tỉ lệ chiều cao hình video (mặc định khi file sub không đặt cỡ là 1/18 ≈ 0.056). Hạ số này nếu chữ vẫn to, tăng nếu muốn cho phép to hơn.
-const SUB_FONT_MAX_RATIO = 1 / 36; // trần theo CHIỀU RỘNG hình = đúng cỡ mặc định khi sub không đặt size (resX / 32 ≈ resY / 18 với 16:9)
+const SUB_FONT_MAX_RATIO = 1 / 36; // trần theo CHIỀU RỘNG hình = đúng cỡ mặc định khi sub không đặt size (resX / 36 ≈ resY / 20 với 16:9)
 const SUB_VOLUME_CHARS = 130; // số ký tự tối đa của một cue trước khi bắt đầu thu nhỏ chữ (chỉnh nếu thấy vừa / quá nhỏ)
 const SUB_MIN_VOLUME_SCALE = 0.5; // thu nhỏ tối đa còn 50%
 
@@ -52,7 +52,7 @@ const cueFontScale = (lines, sx, resX) => {
   let maxFs = 0;
   lines.forEach((line) =>
     line.forEach((seg) => {
-      if (seg.text && seg.text.replace(/\u00a0/g, " ").trim()) maxFs = Math.max(maxFs, seg.fs || resX / 32);
+      if (seg.text && seg.text.replace(/\u00a0/g, " ").trim()) maxFs = Math.max(maxFs, seg.fs || resX / 36);
     })
   );
   const capPx = Math.max(resX * sx * SUB_FONT_MAX_RATIO, 8);
@@ -572,7 +572,7 @@ export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
   const secondary = (opts.secondary || []).filter((c) => c && c.text);
   if (secondary.length) {
     const baseStyle = styles.Default || styles[styleNames[0]] || {};
-    const secFs = Math.min((baseStyle.fontSize || resX / 32) * 0.8, resX * SUB_FONT_MAX_RATIO * 0.8); // sub 2 nhỏ hơn sub 1 và cũng bị chặn cỡ tối đa
+    const secFs = Math.min((baseStyle.fontSize || resX / 36) * 0.8, resX * SUB_FONT_MAX_RATIO * 0.8); // sub 2 nhỏ hơn sub 1 và cũng bị chặn cỡ tối đa
     const secLines = [];
     secondary.forEach((c) => {
       parseAssCue(c.text, DEFAULT_ASS_STYLE, null).lines.forEach((line) => {

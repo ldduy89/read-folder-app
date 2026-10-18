@@ -6,7 +6,7 @@ export const ASS_DEFAULT_RES = { x: 1920, y: 1080 };
 // Style dùng khi không có thông tin style từ sub (giữ kiểu cũ: chữ vàng, đậm)
 export const DEFAULT_ASS_STYLE = {
   fontName: "Tahoma",
-  fontSize: 0, // 0 = tự tính theo chiều rộng khung (PlayResX / 32)
+  fontSize: 0, // 0 = tự tính theo chiều rộng khung (PlayResX / 36)
   primary: "#ffcc00",
   bold: true,
   italic: false,
