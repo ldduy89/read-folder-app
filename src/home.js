@@ -721,8 +721,6 @@ const Home = (props) => {
     null
   );
 
-  console.log(new Date().getTime());
-
   const cleanCueText = (text) => plainCueText(text);
 
   // ---------- Phụ đề tự vẽ theo thiết lập trong sub (ASS: vị trí, cỡ chữ, màu...), nền đen đặc ----------
