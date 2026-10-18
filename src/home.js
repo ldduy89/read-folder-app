@@ -722,7 +722,7 @@ const Home = (props) => {
     const onCueChange = () => {
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
       const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: c.text || "" }));
-      setLiveCues((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+      setLiveCues((prev) => (sameCues(prev, next) ? prev : next));
     };
     const attach = () => {
       const videoEl = document.getElementsByTagName("video")[0];
@@ -768,7 +768,7 @@ const Home = (props) => {
     const onCueChange = () => {
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
       const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, text: c.text || "" }));
-      setLiveCues2((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+      setLiveCues2((prev) => (sameCues(prev, next) ? prev : next));
     };
     const attach = () => {
       const videoEl = document.getElementsByTagName("video")[0];
@@ -828,6 +828,8 @@ const Home = (props) => {
   }, [activeSubLang, subDelay, pathViewFile, audioOnly]);
 
   // So sánh gap theo trường (không dùng JSON.stringify mỗi tick)
+  const sameCues = (a, b) =>
+    a === b || (a.length === b.length && a.every((c, i) => c.key === b[i].key && c.id === b[i].id && c.text === b[i].text));
   const sameGap = (a, b) => a === b || (!!a && !!b && a.next === b.next && a.p === b.p);
 
   // Theo dõi thời gian video -> highlight cue hiện tại và cuộn tới nó
@@ -1107,10 +1109,27 @@ const Home = (props) => {
       );
     };
     calc();
-    const id = setInterval(calc, 500); // video có thể được tạo sau, hoặc đổi độ phân giải giữa chừng
+    // Video có thể được tạo sau: chỉ poll cho tới khi thấy thẻ video, rồi nghe loadedmetadata (đổi độ phân giải) thay vì poll mãi
+    let vid = null;
+    let pollId = null;
+    const attachVideo = () => {
+      vid = document.getElementsByTagName("video")[0] || null;
+      if (vid) vid.addEventListener("loadedmetadata", calc);
+      return !!vid;
+    };
+    if (!attachVideo()) {
+      pollId = setInterval(() => {
+        if (attachVideo()) {
+          clearInterval(pollId);
+          pollId = null;
+          calc();
+        }
+      }, 500);
+    }
     window.addEventListener("resize", calc);
     return () => {
-      clearInterval(id);
+      clearInterval(pollId);
+      if (vid) vid.removeEventListener("loadedmetadata", calc);
       window.removeEventListener("resize", calc);
     };
   }, [frameW, frameH, pathViewFile]);
@@ -1682,6 +1701,25 @@ const Home = (props) => {
     return { axis, forward: dir > 0 };
   };
 
+  // Lớp phụ đề: chỉ dựng lại khi cue / sub / vị trí khung / trạng thái liên quan đổi (không dựng lại mỗi lần onProgress)
+  const onWordRef = useRef(null);
+  onWordRef.current = openTranslate;
+  const controlsHidden = hide && state.playing;
+  const subLayer = React.useMemo(
+    () =>
+      audioOnly
+        ? null
+        : buildAssLayer(liveCues, assMeta, picRect, {
+            secondary: secLang ? liveCues2 : [],
+            controlsHidden,
+            onGrab: () => playingRef.current && setStateElmRef.current({ playing: false }),
+            saved: savedMatcher,
+            hover: isMouse && !touch,
+            onWord: (text, anchor, meta) => onWordRef.current && onWordRef.current(text, anchor, meta)
+          }),
+    [liveCues, liveCues2, assMeta, picRect, secLang, controlsHidden, savedMatcher, isMouse, touch, audioOnly]
+  );
+
   return (
     <>
       <div
@@ -1960,15 +1998,7 @@ const Home = (props) => {
                       />
                     )}
 
-                    {!audioOnly &&
-                      buildAssLayer(liveCues, assMeta, picRect, {
-                        secondary: secLang ? liveCues2 : [],
-                        controlsHidden: hide && state.playing,
-                        onGrab: () => state.playing && setStateElm({ playing: false }),
-                        saved: savedMatcher,
-                        hover: isMouse && !touch,
-                        onWord: openTranslate
-                      })}
+                    {subLayer}
                     {fsSide && !_.isEmpty(subtitles) && (
                       <button
                         type="button"

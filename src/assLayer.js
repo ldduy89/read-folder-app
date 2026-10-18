@@ -332,6 +332,24 @@ const findHits = (text, re) => {
   return out;
 };
 
+// Cache kết quả khớp theo (matcher, text): cùng một cue được render lại nhiều lần thì không chạy lại regex
+const hitsCache = new WeakMap(); // matcher -> Map(text -> hits)
+const findHitsCached = (text, re) => {
+  if (!re) return [];
+  let byText = hitsCache.get(re);
+  if (!byText) {
+    byText = new Map();
+    hitsCache.set(re, byText);
+  }
+  let hits = byText.get(text);
+  if (!hits) {
+    if (byText.size > 300) byText.clear(); // giới hạn bộ nhớ trên TV
+    hits = findHits(text, re);
+    byText.set(text, hits);
+  }
+  return hits;
+};
+
 // Một đoạn đã lưu có thể nằm trên nhiều <span> (câu ngắt dòng \N, hoặc đổi màu giữa câu): các <span> cùng data-sub-hit là một nhóm
 export const hitGroup = (id) => Array.from(document.querySelectorAll("[data-sub-hit]")).filter((el) => el.getAttribute("data-sub-hit") === id);
 
@@ -419,7 +437,7 @@ const renderPieces = (text, offset, hits, uid) => {
 };
 
 // Dùng cho khung danh sách phụ đề bên phải (home.js): uid phải khác nhau giữa các câu (vd "c" + số thứ tự)
-export const highlightSaved = (text, saved, uid = "p") => renderPieces(text, 0, findHits(text, saved), uid);
+export const highlightSaved = (text, saved, uid = "p") => renderPieces(text, 0, findHitsCached(text, saved), uid);
 
 // Ghép cả cue thành một chuỗi (xuống dòng \N = 1 dấu cách) rồi mới khớp, để câu đã lưu nằm trên nhiều dòng / nhiều đoạn chữ vẫn được tô sáng
 // Dòng sub dài hơn SUB_MAX_CHARS ký tự được tách thành 2 dòng: điểm cắt là dấu cách gần giữa câu nhất,
@@ -480,7 +498,7 @@ const renderLines = (parsed, sx, resX, col, wrap, saved, uid) => {
       pos += seg.text.length;
     });
   });
-  const hits = findHits(parts.join(""), saved);
+  const hits = findHitsCached(parts.join(""), saved);
   // Bỏ các dòng/đoạn chỉ có khoảng trắng (&nbsp;): nếu không sẽ vẽ ra ô nền đen trống trên video
   const isBlankText = (t) => !t || !t.replace(/\u00a0/g, " ").trim();
   const capScale = cueFontScale(parsed.lines, sx, resX);
@@ -593,7 +611,7 @@ export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
         secStarts[i] = secPos;
         secPos += t.length;
       });
-      const secHits = findHits(secLines.join(" "), opts.saved);
+      const secHits = findHitsCached(secLines.join(" "), opts.saved);
       const node = (
         <div key="sec2" style={{ textAlign: "center" }}>
           {secLines.map((t, i) => (
