@@ -827,6 +827,9 @@ const Home = (props) => {
     return () => clearTimeout(timer);
   }, [activeSubLang, subDelay, pathViewFile, audioOnly]);
 
+  // So sánh gap theo trường (không dùng JSON.stringify mỗi tick)
+  const sameGap = (a, b) => a === b || (!!a && !!b && a.next === b.next && a.p === b.p);
+
   // Theo dõi thời gian video -> highlight cue hiện tại và cuộn tới nó
   useEffect(() => {
     if (!(isMouse || audioOnly) || _.isEmpty(cueList)) return;
@@ -860,7 +863,7 @@ const Home = (props) => {
           nextGap = { next: nextIdx, p: Math.round(p * 100) / 100 };
         }
       }
-      setGap((prev) => (JSON.stringify(prev) === JSON.stringify(nextGap) ? prev : nextGap));
+      setGap((prev) => (sameGap(prev, nextGap) ? prev : nextGap));
       if (found !== lastCueRef.current) {
         lastCueRef.current = found;
         const panel = document.getElementById("cue_panel");

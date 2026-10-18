@@ -508,6 +508,8 @@ const renderLines = (parsed, sx, resX, col, wrap, saved, uid) => {
  */
 // Khoảng cách giữa sub và thanh điều khiển / thanh thời lượng khi thanh đang hiện, tính theo tỉ lệ chiều cao hình video. Tăng số này để sub cao hơn nữa.
 const SUB_BAR_GAP_RATIO = 0.025;
+// Chỉ áp dụng cho video 16:9: nâng sub bottom lên thêm một khoảng theo tỉ lệ chiều cao hình. Tăng số này để sub cao hơn.
+const SUB_LIFT_16_9_RATIO = 0.03;
 
 export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
   if (!pic || !pic.width || !pic.height) return null;
@@ -521,6 +523,8 @@ export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
   const resY = hasRes ? meta.playResY : pic.vh || ASS_DEFAULT_RES.y;
   const sx = pic.width / resX;
   const sy = pic.height / resY;
+  const is16x9 = Math.abs(pic.width / pic.height - 16 / 9) < 0.02;
+  const lift = is16x9 ? Math.round(pic.height * SUB_LIFT_16_9_RATIO) : 0;
   const styles = meta.styles || {};
   const styleNames = Object.keys(styles);
   const hasStyles = styleNames.length > 0;
@@ -617,15 +621,17 @@ export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
       flexDirection: g.row === 0 ? "column-reverse" : "column"
     };
     if (g.row === 0) {
-      st.transition = "bottom .25s ease-in"; // cùng tốc độ với thanh điều khiển ẩn/hiện
+      // Dùng transform (GPU) thay vì animate bottom (layout lại mỗi khung hình). Đáy neo cố định ở 0, phần nâng được dịch bằng translateY.
+      st.bottom = "0px";
+      st.transition = "transform .25s ease-in"; // cùng tốc độ với thanh điều khiển ẩn/hiện
       const gap = Math.max(10, Math.round(pic.height * SUB_BAR_GAP_RATIO));
       if (opts.controlsHidden) {
         // Thanh điều khiển đã ẩn: hạ phụ đề xuống sát đáy hình (margin theo sub, tối thiểu 4% chiều cao).
         // Thanh ẩn vẫn nằm đè ở đó, nên lớp sub được nâng lên trên thanh (zIndex bên dưới) để bấm vào chữ không bị trúng thanh thời lượng
-        st.bottom = Math.max(mV, pic.height * 0.04) + "px";
+        st.transform = `translateY(-${Math.max(mV, pic.height * 0.04) + lift}px)`;
       } else {
         // Thanh điều khiển đang hiện: chừa chỗ phía trên nó + một khoảng trống nhỏ để khỏi bấm nhầm vào thanh thời lượng
-        st.bottom = `calc(var(--width-bar, 50px) + var(--bar-gap, 0px) + ${mV + gap}px)`;
+        st.transform = `translateY(calc(-1 * (var(--width-bar, 50px) + var(--bar-gap, 0px) + ${mV + gap + lift}px)))`;
       }
     } else if (g.row === 2) {
       st.top = mV + "px";
