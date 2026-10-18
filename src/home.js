@@ -651,8 +651,13 @@ const Home = (props) => {
     if (!videoEl || !videoEl.textTracks) return;
     for (const track of Array.from(videoEl.textTracks)) {
       if (!track.cues || !track.cues.length) continue;
+      if (track._appliedDelay === delay && track._appliedCount === track.cues.length) continue; // đã áp đúng, không quét lại
       const cues = Array.from(track.cues);
-      if (cues.every((c) => c._subDelay === delay)) continue;
+      if (cues.every((c) => c._subDelay === delay)) {
+        track._appliedDelay = delay;
+        track._appliedCount = track.cues.length;
+        continue;
+      }
       for (const cue of cues) {
         if (cue._origStart === undefined) {
           cue._origStart = cue.startTime;
@@ -675,6 +680,8 @@ const Home = (props) => {
         cue.endTime = extEnd + delay;
         cue._subDelay = delay;
       });
+      track._appliedDelay = delay;
+      track._appliedCount = track.cues.length;
     }
   };
 
@@ -913,7 +920,7 @@ const Home = (props) => {
         setLoopIndex(-1); // người dùng tua ra ngoài câu -> tắt lặp
         return;
       }
-      if (t >= cue.end - 0.05) {
+      if (t >= cue.end - 0.1) {
         // Hết câu -> tua ngay về đầu câu, không dừng; khoá ngắn để không tua lặp nhiều lần
         loopWaitRef.current = true;
         player.seekTo(cue.start + 0.01, "seconds");
@@ -921,7 +928,7 @@ const Home = (props) => {
           loopWaitRef.current = false;
         }, 300);
       }
-    }, 50);
+    }, 150);
     return () => {
       clearInterval(id);
       clearTimeout(loopTimerRef.current);
@@ -1200,9 +1207,7 @@ const Home = (props) => {
   };
 
   const setStateElm = (value) => {
-    const newStage = _.cloneDeep(state);
-    _.assign(newStage, value);
-    setState(newStage);
+    setState((prev) => ({ ...prev, ...value })); // state phẳng: không cần cloneDeep mỗi lần onProgress
   };
 
   setStateElmRef.current = setStateElm;
@@ -1703,6 +1708,7 @@ const Home = (props) => {
 
   // Lớp phụ đề: chỉ dựng lại khi cue / sub / vị trí khung / trạng thái liên quan đổi (không dựng lại mỗi lần onProgress)
   const onWordRef = useRef(null);
+  const resumeSaveAtRef = useRef(0);
   onWordRef.current = openTranslate;
   const controlsHidden = hide && state.playing;
   const subLayer = React.useMemo(
@@ -1979,7 +1985,10 @@ const Home = (props) => {
                           // Chỉ lưu khi đã tua xong vị trí cũ, tránh ghi đè bằng số 0
                           if (!resumeReadyRef.current || resumeAtRef.current !== null) return;
                           if (stage.played >= RESUME_MAX_FRACTION) clearResume(pathViewFile);
-                          else if (stage.playedSeconds > 0) setResume(pathViewFile, stage.playedSeconds);
+                          else if (stage.playedSeconds > 0 && Date.now() - resumeSaveAtRef.current > 5000) {
+                            resumeSaveAtRef.current = Date.now();
+                            setResume(pathViewFile, stage.playedSeconds);
+                          }
                         }}
                         config={{
                           attributes: {
