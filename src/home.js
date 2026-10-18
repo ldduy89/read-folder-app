@@ -839,6 +839,50 @@ const Home = (props) => {
     a === b || (a.length === b.length && a.every((c, i) => c.key === b[i].key && c.id === b[i].id && c.text === b[i].text));
   const sameGap = (a, b) => a === b || (!!a && !!b && a.next === b.next && a.p === b.p);
 
+  // Sub không có vị trí (\pos / \move) và không có sub thứ 2: để trình duyệt vẽ bằng ::cue, không dựng lớp JS
+  const [nativeSub, setNativeSub] = useState(false);
+  const trackHasPos = (track) => {
+    const cues = track && track.cues ? Array.from(track.cues) : [];
+    if (track._posCount === cues.length) return track._hasPos;
+    const has = cues.some((c) => {
+      const t = c.text || "";
+      return t.includes(String.fromCharCode(92) + "pos(") || t.includes(String.fromCharCode(92) + "move(");
+    });
+    track._posCount = cues.length;
+    track._hasPos = has;
+    return has;
+  };
+  useEffect(() => {
+    setNativeSub(false);
+    if (type !== "file" || !activeSubLang || secLang || audioOnly || isMouse) return; // chỉ TV dùng ::cue; PC/điện thoại vẫn dựng bằng JS
+    let timer;
+    let tries = 0;
+    let track = null;
+    let native = false;
+    const check = () => {
+      const videoEl = document.getElementsByTagName("video")[0];
+      track = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks).find((t) => t.language === activeSubLang) : null;
+      if (!track) {
+        if (tries++ < 120) timer = setTimeout(check, 500);
+        return;
+      }
+      if (track.mode === "disabled") track.mode = "hidden"; // hidden để trình duyệt tải cue
+      if (!track.cues || !track.cues.length) {
+        if (tries++ < 120) timer = setTimeout(check, 500);
+        return;
+      }
+      native = !trackHasPos(track);
+      track.mode = native ? "showing" : "hidden";
+      setNativeSub(native);
+    };
+    check();
+    return () => {
+      clearTimeout(timer);
+      if (track && native) track.mode = "hidden"; // tắt sub / đổi sub: không để ::cue còn vẽ
+      setNativeSub(false);
+    };
+  }, [activeSubLang, pathViewFile, secLang, audioOnly, type, isMouse]);
+
   // Theo dõi thời gian video -> highlight cue hiện tại và cuộn tới nó
   useEffect(() => {
     if (!(isMouse || audioOnly) || _.isEmpty(cueList)) return;
@@ -1713,7 +1757,7 @@ const Home = (props) => {
   const controlsHidden = hide && state.playing;
   const subLayer = React.useMemo(
     () =>
-      audioOnly
+      audioOnly || nativeSub
         ? null
         : buildAssLayer(liveCues, assMeta, picRect, {
             secondary: secLang ? liveCues2 : [],
@@ -1723,7 +1767,7 @@ const Home = (props) => {
             hover: isMouse && !touch,
             onWord: (text, anchor, meta) => onWordRef.current && onWordRef.current(text, anchor, meta)
           }),
-    [liveCues, liveCues2, assMeta, picRect, secLang, controlsHidden, savedMatcher, isMouse, touch, audioOnly]
+    [liveCues, liveCues2, assMeta, picRect, secLang, controlsHidden, savedMatcher, isMouse, touch, audioOnly, nativeSub]
   );
 
   return (
@@ -1985,7 +2029,7 @@ const Home = (props) => {
                           // Chỉ lưu khi đã tua xong vị trí cũ, tránh ghi đè bằng số 0
                           if (!resumeReadyRef.current || resumeAtRef.current !== null) return;
                           if (stage.played >= RESUME_MAX_FRACTION) clearResume(pathViewFile);
-                          else if (stage.playedSeconds > 0 && Date.now() - resumeSaveAtRef.current > 5000) {
+                          else if (stage.playedSeconds > 0 && Date.now() - resumeSaveAtRef.current > 15000) {
                             resumeSaveAtRef.current = Date.now();
                             setResume(pathViewFile, stage.playedSeconds);
                           }
