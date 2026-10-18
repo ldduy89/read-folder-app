@@ -54,6 +54,13 @@ import {
 import { Link, useHistory } from "react-router-dom";
 import { HiArrowsPointingIn, HiArrowsPointingOut } from "react-icons/hi2";
 
+// ---- DEBUG: đếm số lần chạy của từng nguồn. Gõ window.__dbg trong console để xem.
+const dbg = (name) => {
+  if (!window.__dbg) window.__dbg = {};
+  window.__dbg[name] = (window.__dbg[name] || 0) + 1;
+};
+
+
 // Xoay màn hình theo toàn màn hình (điện thoại / máy tính bảng): vào full -> khoá ngang, thoát -> khoá dọc rồi trả lại tự xoay.
 // Chỉ chạy ở trình duyệt có screen.orientation.lock (Chrome / Firefox Android); iPhone không hỗ trợ nên bỏ qua êm.
 const orient = () => (typeof window !== "undefined" && window.screen && window.screen.orientation) || null;
@@ -120,10 +127,8 @@ const Home = (props) => {
     })(),
     loop: false
   };
-const renderCountRef = useRef(0);
-renderCountRef.current += 1;
-console.log("render", renderCountRef.current);
 
+  dbg("render");
   const [folders, setFolders] = useState([]);
   const [filesOfParent, setFilesOfParent] = useState([]);
   const [subtitles, setSubtitles] = useState(null);
@@ -698,6 +703,11 @@ console.log("render", renderCountRef.current);
   const [cueList, setCueList] = useState([]); // [{ start, end, text }]
   const [cueIndex, setCueIndex] = useState(-1); // cue đang được phát (-1: không có)
   const [gap, setGap] = useState(null); // khoảng trống giữa hai sub: { next: idx sub kế tiếp, p: tỉ lệ đã trôi 0..1 }
+  // Ref phản ánh giá trị đang hiển thị: vòng theo dõi cue so sánh ở đây, chỉ gọi setState khi thật sự đổi
+  const cueIndexRef = useRef(-1);
+  cueIndexRef.current = cueIndex;
+  const gapRef = useRef(null);
+  gapRef.current = gap;
   const [loopIndex, setLoopIndex] = useState(-1); // cue đang bật lặp lại (-1: tắt)
   const loopWaitRef = useRef(false); // khoá ngắn sau mỗi lần tua lặp
   const loopTimerRef = useRef(null);
@@ -710,6 +720,8 @@ console.log("render", renderCountRef.current);
     "language",
     null
   );
+
+  console.log(new Date().getTime());
 
   const cleanCueText = (text) => plainCueText(text);
 
@@ -736,6 +748,7 @@ console.log("render", renderCountRef.current);
     let tries = 0;
     let track = null;
     const onCueChange = () => {
+      dbg("cueChange");
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
       const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: c.text || "" }));
       setLiveCues((prev) => (sameCues(prev, next) ? prev : next));
@@ -782,6 +795,7 @@ console.log("render", renderCountRef.current);
     let tries = 0;
     let track = null;
     const onCueChange = () => {
+      dbg("cueChange");
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
       const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, text: c.text || "" }));
       setLiveCues2((prev) => (sameCues(prev, next) ? prev : next));
@@ -900,6 +914,7 @@ console.log("render", renderCountRef.current);
     const id = setInterval(() => {
       const player = playerRef.current;
       if (!player) return;
+      dbg("cueTick");
       const t = player.getCurrentTime() || 0;
       let lo = 0;
       let hi = cueList.length - 1;
@@ -914,7 +929,10 @@ console.log("render", renderCountRef.current);
         }
       }
       const live = found >= 0 && t < cueList[found].end ? found : -1;
-      setCueIndex((prev) => (prev === live ? prev : live));
+      if (live !== cueIndexRef.current) {
+        cueIndexRef.current = live;
+        setCueIndex(live);
+      }
       // Khi không có sub đang hiện: tính tỉ lệ thời gian đã trôi từ lúc sub trước kết thúc tới lúc sub kế tiếp bắt đầu
       let nextGap = null;
       const nextIdx = found + 1;
@@ -927,7 +945,18 @@ console.log("render", renderCountRef.current);
           nextGap = { next: nextIdx, p: Math.round(p * 100) / 100 };
         }
       }
-      setGap((prev) => (sameGap(prev, nextGap) ? prev : nextGap));
+      // Thanh khoảng trống chỉ cần render lại khi xuất hiện / biến mất / sang sub khác (hiếm).
+      // Khi chỉ đổi tỉ lệ (p đổi mỗi 1%) thì cập nhật thẳng vào DOM, không render lại cả component.
+      const prevNext = gapRef.current ? gapRef.current.next : null;
+      const nowNext = nextGap ? nextGap.next : null;
+      if (prevNext !== nowNext) {
+        gapRef.current = nextGap;
+        setGap(nextGap);
+      } else if (nextGap) {
+        const bar = document.getElementById("gap_bar");
+        if (bar) bar.style.width = `${nextGap.p * 100}%`;
+        gapRef.current = nextGap;
+      }
       if (found !== lastCueRef.current) {
         lastCueRef.current = found;
         const panel = document.getElementById("cue_panel");
@@ -970,7 +999,7 @@ console.log("render", renderCountRef.current);
       const player = playerRef.current;
       if (!cue || !player) return;
       if (Date.now() - loopSinceRef.current < 800) return; // chờ lệnh tua ban đầu có hiệu lực
-      const t = player.getCurrentTime() || 0;
+      dbg("loopTick"); const t = player.getCurrentTime() || 0;
       if (t < cue.start - 0.5 || t > cue.end + 0.5) {
         setLoopIndex(-1); // người dùng tua ra ngoài câu -> tắt lặp
         return;
@@ -1275,11 +1304,22 @@ console.log("render", renderCountRef.current);
   };
 
   const setStateElm = (value) => {
+    dbg("setStateElm");
     if (value && "played" in value) playedRef.current = value.played;
     setState((prev) => ({ ...prev, ...value })); // state phẳng: không cần cloneDeep mỗi lần onProgress
   };
 
   setStateElmRef.current = setStateElm;
+
+  // Thanh điều khiển vừa hiện lại: đồng bộ thanh tiến trình với vị trí hiện tại
+  const prevHideUIRef = useRef(hideUI);
+  useEffect(() => {
+    if (prevHideUIRef.current && !hideUI) {
+      lastProgressSecRef.current = -1;
+      setStateElm({ played: playedRef.current });
+    }
+    prevHideUIRef.current = hideUI;
+  }, [hideUI]);
 
   const handleFullSreen = (isFullSreen) => {
     if (isFullSreen) {
@@ -2050,8 +2090,11 @@ console.log("render", renderCountRef.current);
                         onDuration={(duration) => setStateElm({ duration: duration })}
                         onEnded={() => handleActionFile(nextFile, backRootPath)}
                         onProgress={(stage) => {
+                          dbg("progress");
                           const sec = Math.floor(stage.playedSeconds || 0);
-                          if (sec !== lastProgressSecRef.current) {
+                          if (hideUI) {
+                            playedRef.current = stage.played; // thanh điều khiển đang ẩn: không cập nhật state, chỉ giữ giá trị
+                          } else if (sec !== lastProgressSecRef.current) {
                             lastProgressSecRef.current = sec;
                             setStateElm({ played: stage.played }); // thanh tiến trình cập nhật mỗi giây, không mỗi tick
                           } else {
@@ -2620,7 +2663,7 @@ console.log("render", renderCountRef.current);
                               title="Còn bao lâu đến sub tiếp theo"
                               style={{ height: 3, margin: "6px 10px 0", background: "#333", borderRadius: 2, overflow: "hidden" }}
                             >
-                              <div style={{ height: "100%", width: `${gap.p * 100}%`, background: "#ffd700", transition: "width .25s linear" }} />
+                              <div id="gap_bar" style={{ height: "100%", width: `${gap.p * 100}%`, background: "#ffd700", transition: "width .25s linear" }} />
                             </div>
                           )}
                           <div
