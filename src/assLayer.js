@@ -23,6 +23,8 @@ let subFontFamily = SUB_FONT;
 export const setSubFontFamily = (choice) => {
   subFontFamily = choice || SUB_FONT;
 };
+// Font đang dùng cho sub (đã thay rỗng bằng font mặc định): ::cue cũng dùng đúng font này qua biến CSS
+export const getSubFontFamily = () => subFontFamily;
 // Font Lá xanh và Open Sans dùng line-height 1.44, Arial/Georgia/Times 1.16, Varela Round và font khác 1.26
 // Chỉ xét font chính (phần trước dấu phẩy), không xét font dự phòng: chuỗi mặc định có "Arial" ở sau
 const subLineHeight = () => {
@@ -527,7 +529,7 @@ const renderLines = (parsed, sx, resX, col, wrap, saved, uid) => {
 // Khoảng cách giữa sub và thanh điều khiển / thanh thời lượng khi thanh đang hiện, tính theo tỉ lệ chiều cao hình video. Tăng số này để sub cao hơn nữa.
 const SUB_BAR_GAP_RATIO = 0.025;
 // Chỉ áp dụng cho video 16:9: nâng sub bottom lên thêm một khoảng theo tỉ lệ chiều cao hình. Tăng số này để sub cao hơn.
-const SUB_LIFT_16_9_RATIO = 0.00;
+const SUB_LIFT_16_9_RATIO = 0.03;
 
 export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
   if (!pic || !pic.width || !pic.height) return null;

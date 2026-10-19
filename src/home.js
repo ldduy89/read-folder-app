@@ -17,7 +17,8 @@ import {
   swipeSelectHandlers,
   recentWordSelect,
   SUB_FONT_CHOICES,
-  setSubFontFamily
+  setSubFontFamily,
+  getSubFontFamily
 } from "./assLayer";
 import { getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
 import TranslatePopup from "./translatePopup";
@@ -53,6 +54,172 @@ import {
 } from "./icons";
 import { Link, useHistory } from "react-router-dom";
 import { HiArrowsPointingIn, HiArrowsPointingOut } from "react-icons/hi2";
+
+// Cue đang hiển thị được giữ trong store (không phải state của Home): đổi cue không làm Home render lại.
+const makeCueStore = (init = []) => ({
+  value: init,
+  listeners: new Set(),
+  set(v) {
+    if (v === this.value) return;
+    this.value = v;
+    this.listeners.forEach((fn) => fn(v));
+  },
+  subscribe(fn) {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  },
+});
+const cueStore = makeCueStore();
+const cueStore2 = makeCueStore();
+// Dòng đang phát và khoảng trống giữa sub: chỉ khung danh sách (CueRows) đăng ký, không làm Home render
+const cueIndexStore = makeCueStore(-1);
+const gapStore = makeCueStore(null);
+
+// Khung danh sách cue: tự đăng ký dòng đang phát và khoảng trống, nên đổi dòng chỉ render lại khung này
+function CueRows({ cueList, audioOnly, fsSide, touch, seekToCue, savedMatcher, formatClock, loopIndex, toggleLoop }) {
+  const cueIndex = useStoreValue(cueIndexStore);
+  const gap = useStoreValue(gapStore);
+  return (
+    <>
+      {cueList.map((cue, i) => (
+                        <React.Fragment key={i}>
+                          {gap && gap.next === i && (
+                            <div
+                              title="Còn bao lâu đến sub tiếp theo"
+                              style={{ height: 3, margin: "6px 10px 0", background: "#333", borderRadius: 2, overflow: "hidden" }}
+                            >
+                              <div id="gap_bar" style={{ height: "100%", width: `${gap.p * 100}%`, background: "#ffd700", transition: "width .25s linear" }} />
+                            </div>
+                          )}
+                          <div
+                            id={`cue_${i}`}
+                            onClick={audioOnly ? undefined : () => seekToCue(cue)} // chỉ nghe: bấm vào chữ để tô đen / dịch, đi tới câu bằng nút riêng
+                            style={{
+                              padding: "6px 10px",
+                              cursor: audioOnly ? "default" : "pointer",
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: "8px",
+                              borderLeft: `3px solid ${i === cueIndex ? "#ffd700" : "transparent"}`,
+                              background: i === cueIndex ? "#2c2c2c" : "transparent",
+                              color: i === cueIndex ? "#fff" : "#aaa"
+                            }}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <span style={{ color: "#777", fontSize: fsSide ? "10px" : "12px", marginRight: "8px" }}>{formatClock(cue.start)}</span>
+                              <span data-sub-seg="1" style={audioOnly ? { cursor: "text", userSelect: "text", WebkitUserSelect: "text" } : undefined}>
+                                {highlightSaved(cue.text, savedMatcher, "c" + i)}
+                              </span>
+                            </div>
+                            {audioOnly && (
+                              <button
+                                type="button"
+                                title="Phát video từ câu này"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  seekToCue(cue);
+                                }}
+                                style={{
+                                  flexShrink: 0,
+                                  width: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
+                                  height: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
+                                  borderRadius: "50%",
+                                  border: "1px solid #5aa564",
+                                  background: "transparent",
+                                  color: "#7fcf8a",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  lineHeight: 1,
+                                  fontSize: "13px",
+                                  padding: 0,
+                                  cursor: "pointer"
+                                }}
+                              >
+                                ▶
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              title="Lặp lại câu này"
+                              aria-pressed={i === loopIndex}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleLoop(i);
+                              }}
+                              style={{
+                                flexShrink: 0,
+                                width: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
+                                height: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
+                                borderRadius: "50%",
+                                border: "1px solid " + (i === loopIndex ? "#ffd700" : "#444"),
+                                background: i === loopIndex ? "#ffd700" : "transparent",
+                                color: i === loopIndex ? "#000" : "#888",
+                                fontSize: "14px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                lineHeight: 1,
+                                padding: 0,
+                                cursor: "pointer"
+                              }}
+                            >
+                              ⟲
+                            </button>
+                          </div>
+                        </React.Fragment>
+      ))}
+    </>
+  );
+}
+
+function useStoreValue(store) {
+  const [v, setV] = useState(store.value);
+  useEffect(() => store.subscribe(setV), [store]);
+  return v;
+}
+
+// Sub thường do JS vẽ (SubtitleLayer). ::cue chỉ còn là tùy chọn, đang tắt.
+const USE_NATIVE_CUE = false;
+const EMPTY_CUES = [];
+// Component hiển thị sub: tự đăng ký cue từ store, nên đổi cue chỉ render lại chính nó.
+const SubtitleLayer = React.memo(function SubtitleLayer({ meta, rect, secondaryOn, controlsHidden, saved, hover, onGrab, onWord }) {
+  const cues = useStoreValue(cueStore);
+  const cues2 = useStoreValue(cueStore2);
+  return buildAssLayer(cues, meta, rect, {
+    secondary: secondaryOn ? cues2 : EMPTY_CUES,
+    controlsHidden,
+    onGrab,
+    saved,
+    hover,
+    onWord
+  }) || null;
+});
+
+
+// Vị trí dọc của sub native (% chiều cao hình, tính từ trên xuống). 90 = mép dưới sub ở 80% chiều cao.
+const CUE_BOTTOM_PERCENT = 80;
+// Cue có \pos/\move: JS sẽ vẽ đúng vị trí, nên giữ text gốc trong _posText và để trống text của track native
+// (tránh vẽ hai lần). Các cue khác giữ nguyên để trình duyệt (::cue) vẽ.
+const normalizePosCues = (track) => {
+  const BS = String.fromCharCode(92);
+  for (const c of Array.from(track.cues || [])) {
+    if (c._scanned) continue;
+    c._scanned = true;
+    // Đưa cue native lên cao: mép dưới của sub nằm ở CUE_BOTTOM_PERCENT % chiều cao hình (tính từ trên xuống)
+    if ("line" in c) {
+      c.snapToLines = false;
+      c.line = CUE_BOTTOM_PERCENT;
+      c.lineAlign = "end";
+    }
+    const t = c.text || "";
+    if (t.includes(BS + "pos(") || t.includes(BS + "move(")) {
+      c._posText = t;
+      c.text = "";
+    }
+  }
+};
+
 
 // Vị trí phát tách khỏi state của Home: chỉ các thành phần hiển thị thời gian đăng ký vào đây,
 // nên mỗi lần tiến trình đổi không làm Home render lại (kéo theo cả giao diện).
@@ -158,6 +325,8 @@ const Home = (props) => {
     })(),
     loop: false
   };
+
+console.log('sdaadad');
 
   const [folders, setFolders] = useState([]);
   const [filesOfParent, setFilesOfParent] = useState([]);
@@ -688,6 +857,7 @@ const Home = (props) => {
 
   // Kéo dài thời gian hiển thị mỗi sub thêm tối đa 0.5s, nhưng không vượt quá thời điểm bắt đầu của sub kế tiếp
   const SUB_EXTEND_MAX = 0.5; // giây
+  const SUB_CLEAR_GAP = 0.05; // giây: sub cũ kết thúc trước sub kế tiếp một chút để không bao giờ chồng lên nhau
 
   // Dịch thời gian của tất cả cue (tính từ thời điểm gốc nên không bị cộng dồn sai số) và kéo dài thời gian hiển thị
   const applySubDelay = (delay) => {
@@ -719,7 +889,7 @@ const Home = (props) => {
           }
         }
         // không bao giờ rút ngắn: nếu sub kế tiếp bắt đầu trước khi cue này hết thì giữ nguyên thời điểm kết thúc gốc
-        const extEnd = Math.max(cue._origEnd, Math.min(cue._origEnd + SUB_EXTEND_MAX, nextStart));
+        const extEnd = Math.max(cue._origEnd, Math.min(cue._origEnd + SUB_EXTEND_MAX, nextStart - SUB_CLEAR_GAP));
         cue.startTime = cue._origStart + delay;
         cue.endTime = extEnd + delay;
         cue._subDelay = delay;
@@ -731,13 +901,6 @@ const Home = (props) => {
 
   // ---------- Danh sách phụ đề bên cạnh video (PC) ----------
   const [cueList, setCueList] = useState([]); // [{ start, end, text }]
-  const [cueIndex, setCueIndex] = useState(-1); // cue đang được phát (-1: không có)
-  const [gap, setGap] = useState(null); // khoảng trống giữa hai sub: { next: idx sub kế tiếp, p: tỉ lệ đã trôi 0..1 }
-  // Ref phản ánh giá trị đang hiển thị: vòng theo dõi cue so sánh ở đây, chỉ gọi setState khi thật sự đổi
-  const cueIndexRef = useRef(-1);
-  cueIndexRef.current = cueIndex;
-  const gapRef = useRef(null);
-  gapRef.current = gap;
   // Khung danh sách cue (có ô tiến độ khoảng trống, dòng đang phát) chỉ hiện trên PC hoặc khi chỉ nghe.
   // Trên TV (đang xem hình) khung này không được render, nên không cần cập nhật cueIndex / gap.
   const panelVisibleRef = useRef(false);
@@ -758,7 +921,6 @@ const Home = (props) => {
   const cleanCueText = (text) => plainCueText(text);
 
   // ---------- Phụ đề tự vẽ theo thiết lập trong sub (ASS: vị trí, cỡ chữ, màu...), nền đen đặc ----------
-  const [liveCues, setLiveCues] = useState([]); // cue đang hiển thị: [{ key, id, text }]
   const [assMeta, setAssMeta] = useState(null); // { playResX, playResY, styles } của sub đang chọn
   useEffect(() => {
     setAssMeta(null);
@@ -774,15 +936,18 @@ const Home = (props) => {
   }, [activeSubLang, pathViewFile]);
 
   useEffect(() => {
-    setLiveCues([]);
+    cueStore.set(EMPTY_CUES);
     if (type !== "file" || !activeSubLang) return;
     let timer;
     let tries = 0;
     let track = null;
     const onCueChange = () => {
+      const nativeMode = !!track && track === nativeTrackRef.current;
+      if (nativeMode) normalizePosCues(track);
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
-      const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: c.text || "" }));
-      setLiveCues((prev) => (sameCues(prev, next) ? prev : next));
+      const picked = nativeMode ? cues.filter((c) => c._posText) : cues;
+      const next = picked.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: (c._posText ?? c.text) || "" }));
+      cueStore.set(sameCues(cueStore.value, next) ? cueStore.value : next);
     };
     const attach = () => {
       const videoEl = document.getElementsByTagName("video")[0];
@@ -818,9 +983,8 @@ const Home = (props) => {
     } catch (e) {}
   };
   const secLang = secondLang && secondLang !== activeSubLang && (subtitles || []).some((sub) => sub.language === secondLang) ? secondLang : null;
-  const [liveCues2, setLiveCues2] = useState([]);
   useEffect(() => {
-    setLiveCues2([]);
+    cueStore2.set(EMPTY_CUES);
     if (type !== "file" || !secLang) return;
     let timer;
     let tries = 0;
@@ -828,7 +992,7 @@ const Home = (props) => {
     const onCueChange = () => {
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
       const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, text: c.text || "" }));
-      setLiveCues2((prev) => (sameCues(prev, next) ? prev : next));
+      cueStore2.set(sameCues(cueStore2.value, next) ? cueStore2.value : next);
     };
     const attach = () => {
       const videoEl = document.getElementsByTagName("video")[0];
@@ -859,7 +1023,7 @@ const Home = (props) => {
   // Đổi ngôn ngữ phụ đề / đổi file -> xoá danh sách cũ
   useEffect(() => {
     setCueList([]);
-    setCueIndex(-1);
+    cueIndexStore.set(-1);
     lastCueRef.current = -2;
     setLoopIndex(-1);
   }, [activeSubLang, pathViewFile]);
@@ -873,9 +1037,10 @@ const Home = (props) => {
       const videoEl = document.getElementsByTagName("video")[0];
       const track = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks).find((t) => t.language === activeSubLang) : null;
       if (track && track.cues && track.cues.length) {
+        applySubDelay(subDelay); // áp độ trễ + kéo dài trước, để danh sách cue khớp thời gian đang hiển thị
         setCueList(
           Array.from(track.cues)
-            .map((c) => ({ start: c.startTime, end: c.endTime, text: cleanCueText(c.text) }))
+            .map((c) => ({ start: c.startTime, end: c.endTime, text: cleanCueText(c._posText ?? c.text) }))
             .filter((c) => c.text)
         );
         lastCueRef.current = -2;
@@ -894,18 +1059,8 @@ const Home = (props) => {
 
   // Sub không có vị trí (\pos / \move) và không có sub thứ 2: để trình duyệt vẽ bằng ::cue, không dựng lớp JS
   const [nativeSub, setNativeSub] = useState(false);
-  const trackHasPos = (track) => {
-    const cues = track && track.cues ? Array.from(track.cues) : [];
-    if (track._posCount === cues.length) return track._hasPos;
-    const has = cues.some((c) => {
-      const t = c.text || "";
-      return t.includes(String.fromCharCode(92) + "pos(") || t.includes(String.fromCharCode(92) + "move(");
-    });
-    track._posCount = cues.length;
-    track._hasPos = has;
-    return has;
-  };
   useEffect(() => {
+    if (!USE_NATIVE_CUE) return;
     setNativeSub(false);
     if (type !== "file" || !activeSubLang || secLang || audioOnly || isMouse) return; // chỉ TV dùng ::cue; PC/điện thoại vẫn dựng bằng JS
     let timer;
@@ -924,8 +1079,9 @@ const Home = (props) => {
         if (tries++ < 120) timer = setTimeout(check, 500);
         return;
       }
-      native = !trackHasPos(track);
-      nativeTrackRef.current = native ? track : null;
+      normalizePosCues(track);
+      native = true;
+      nativeTrackRef.current = track;
       track.mode = trackModeFor(track);
       setNativeSub(native);
     };
@@ -959,10 +1115,7 @@ const Home = (props) => {
       }
       const live = found >= 0 && t < cueList[found].end ? found : -1;
       const panelOn = panelVisibleRef.current;
-      if (panelOn && live !== cueIndexRef.current) {
-        cueIndexRef.current = live;
-        setCueIndex(live);
-      }
+      if (panelOn && live !== cueIndexStore.value) cueIndexStore.set(live);
       // Khi không có sub đang hiện: tính tỉ lệ thời gian đã trôi từ lúc sub trước kết thúc tới lúc sub kế tiếp bắt đầu
       let nextGap = null;
       const nextIdx = found + 1;
@@ -977,17 +1130,16 @@ const Home = (props) => {
       }
       // Thanh khoảng trống chỉ cần render lại khi xuất hiện / biến mất / sang sub khác (hiếm).
       // Khi chỉ đổi tỉ lệ (p đổi mỗi 1%) thì cập nhật thẳng vào DOM, không render lại cả component.
-      const prevNext = gapRef.current ? gapRef.current.next : null;
+      const prevNext = gapStore.value ? gapStore.value.next : null;
       const nowNext = nextGap ? nextGap.next : null;
       if (!panelOn) {
         // không có khung danh sách trên TV: bỏ qua
       } else if (prevNext !== nowNext) {
-        gapRef.current = nextGap;
-        setGap(nextGap);
+        gapStore.set(nextGap);
       } else if (nextGap) {
         const bar = document.getElementById("gap_bar");
         if (bar) bar.style.width = `${nextGap.p * 100}%`;
-        gapRef.current = nextGap;
+        gapStore.value = nextGap; // lưu giá trị mới nhất để so sánh lần sau, không render
       }
       if (found !== lastCueRef.current) {
         lastCueRef.current = found;
@@ -1298,6 +1450,8 @@ const Home = (props) => {
     // Chiều cao tối đa của popup chọn (sub / tốc độ / audio): không cao quá khung video (chỉ nghe: khung rất thấp nên cho tối đa 230px, popup mở lên trên)
     "--menu-max-h": audioOnly ? "230px" : videoH ? Math.max(videoH - barPx - 16, 80) + "px" : "70vh",
     "--font-size-subtitle": videoW ? Math.max(videoW / 36, 14) + "px" : "24px",
+    // Font sub người dùng chọn: ::cue (native trên TV) đọc biến này
+    "--font-family-subtitle": getSubFontFamily(),
     // Tiêu đề video co giãn theo độ rộng khung video
     "--font-size-title": titlePx + "px"
   };
@@ -1845,20 +1999,9 @@ const Home = (props) => {
   const resumeSaveAtRef = useRef(0);
   onWordRef.current = openTranslate;
   const controlsHidden = hide && state.playing;
-  const subLayer = React.useMemo(
-    () =>
-      audioOnly || nativeSub
-        ? null
-        : buildAssLayer(liveCues, assMeta, picRect, {
-            secondary: secLang ? liveCues2 : [],
-            controlsHidden,
-            onGrab: () => playingRef.current && setStateElmRef.current({ playing: false }),
-            saved: savedMatcher,
-            hover: isMouse && !touch,
-            onWord: (text, anchor, meta) => onWordRef.current && onWordRef.current(text, anchor, meta)
-          }),
-    [liveCues, liveCues2, assMeta, picRect, secLang, controlsHidden, savedMatcher, isMouse, touch, audioOnly, nativeSub]
-  );
+  // Callback ổn định (đọc qua ref) để SubtitleLayer memo không render lại vô ích
+  const grabStable = React.useCallback(() => playingRef.current && setStateElmRef.current({ playing: false }), []);
+  const wordStable = React.useCallback((text, anchor, meta) => onWordRef.current && onWordRef.current(text, anchor, meta), []);
 
   return (
     <>
@@ -2142,7 +2285,18 @@ const Home = (props) => {
                       />
                     )}
 
-                    {subLayer}
+                    {!audioOnly && (
+                      <SubtitleLayer
+                        meta={assMeta}
+                        rect={picRect}
+                        secondaryOn={!!secLang}
+                        controlsHidden={controlsHidden}
+                        saved={savedMatcher}
+                        hover={isMouse && !touch}
+                        onGrab={grabStable}
+                        onWord={wordStable}
+                      />
+                    )}
                     {fsSide && !_.isEmpty(subtitles) && (
                       <button
                         type="button"
@@ -2673,94 +2827,17 @@ const Home = (props) => {
                     ) : _.isEmpty(cueList) ? (
                       <div style={{ padding: "16px", color: "#888" }}>Đang tải phụ đề...</div>
                     ) : (
-                      cueList.map((cue, i) => (
-                        <React.Fragment key={i}>
-                          {gap && gap.next === i && (
-                            <div
-                              title="Còn bao lâu đến sub tiếp theo"
-                              style={{ height: 3, margin: "6px 10px 0", background: "#333", borderRadius: 2, overflow: "hidden" }}
-                            >
-                              <div id="gap_bar" style={{ height: "100%", width: `${gap.p * 100}%`, background: "#ffd700", transition: "width .25s linear" }} />
-                            </div>
-                          )}
-                          <div
-                            id={`cue_${i}`}
-                            onClick={audioOnly ? undefined : () => seekToCue(cue)} // chỉ nghe: bấm vào chữ để tô đen / dịch, đi tới câu bằng nút riêng
-                            style={{
-                              padding: "6px 10px",
-                              cursor: audioOnly ? "default" : "pointer",
-                              display: "flex",
-                              alignItems: "flex-start",
-                              gap: "8px",
-                              borderLeft: `3px solid ${i === cueIndex ? "#ffd700" : "transparent"}`,
-                              background: i === cueIndex ? "#2c2c2c" : "transparent",
-                              color: i === cueIndex ? "#fff" : "#aaa"
-                            }}
-                          >
-                            <div style={{ flex: 1 }}>
-                              <span style={{ color: "#777", fontSize: fsSide ? "10px" : "12px", marginRight: "8px" }}>{formatClock(cue.start)}</span>
-                              <span data-sub-seg="1" style={audioOnly ? { cursor: "text", userSelect: "text", WebkitUserSelect: "text" } : undefined}>
-                                {highlightSaved(cue.text, savedMatcher, "c" + i)}
-                              </span>
-                            </div>
-                            {audioOnly && (
-                              <button
-                                type="button"
-                                title="Phát video từ câu này"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  seekToCue(cue);
-                                }}
-                                style={{
-                                  flexShrink: 0,
-                                  width: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
-                                  height: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
-                                  borderRadius: "50%",
-                                  border: "1px solid #5aa564",
-                                  background: "transparent",
-                                  color: "#7fcf8a",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  lineHeight: 1,
-                                  fontSize: "13px",
-                                  padding: 0,
-                                  cursor: "pointer"
-                                }}
-                              >
-                                ▶
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              title="Lặp lại câu này"
-                              aria-pressed={i === loopIndex}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleLoop(i);
-                              }}
-                              style={{
-                                flexShrink: 0,
-                                width: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
-                                height: fsSide ? (touch ? "28px" : "22px") : touch ? "36px" : "28px",
-                                borderRadius: "50%",
-                                border: "1px solid " + (i === loopIndex ? "#ffd700" : "#444"),
-                                background: i === loopIndex ? "#ffd700" : "transparent",
-                                color: i === loopIndex ? "#000" : "#888",
-                                fontSize: "14px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                lineHeight: 1,
-                                padding: 0,
-                                cursor: "pointer"
-                              }}
-                            >
-                              ⟲
-                            </button>
-                          </div>
-                        </React.Fragment>
-                      ))
+                      <CueRows
+                        cueList={cueList}
+                        audioOnly={audioOnly}
+                        fsSide={fsSide}
+                        touch={touch}
+                        seekToCue={seekToCue}
+                        savedMatcher={savedMatcher}
+                        formatClock={formatClock}
+                        loopIndex={loopIndex}
+                        toggleLoop={toggleLoop}
+                      />
                     )}
                   </div>
                 )}

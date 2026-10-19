@@ -14,7 +14,7 @@
 .react-player video::cue{
   font-size: var(--font-size-subtitle);
   font-weight: 700;
-  font-family: "UVN La Xanh", Tahoma, sans-serif;
+  font-family: var(--font-family-subtitle, "Varela Round", Helvetica, Arial, sans-serif);
   background-color: #000;
   color:#ffcc00;
   position:absolute;
