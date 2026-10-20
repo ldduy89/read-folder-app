@@ -23,8 +23,6 @@ let subFontFamily = SUB_FONT;
 export const setSubFontFamily = (choice) => {
   subFontFamily = choice || SUB_FONT;
 };
-// Font đang dùng cho sub (đã thay rỗng bằng font mặc định): ::cue cũng dùng đúng font này qua biến CSS
-export const getSubFontFamily = () => subFontFamily;
 // Font Lá xanh và Open Sans dùng line-height 1.44, Arial/Georgia/Times 1.16, Varela Round và font khác 1.26
 // Chỉ xét font chính (phần trước dấu phẩy), không xét font dự phòng: chuỗi mặc định có "Arial" ở sau
 const subLineHeight = () => {

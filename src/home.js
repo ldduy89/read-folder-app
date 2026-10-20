@@ -18,7 +18,6 @@ import {
   recentWordSelect,
   SUB_FONT_CHOICES,
   setSubFontFamily,
-  getSubFontFamily
 } from "./assLayer";
 import { getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
 import TranslatePopup from "./translatePopup";
@@ -215,8 +214,6 @@ function useStoreValue(store) {
   return v;
 }
 
-// Sub thường do JS vẽ (SubtitleLayer). ::cue chỉ còn là tùy chọn, đang tắt.
-const USE_NATIVE_CUE = false;
 const EMPTY_CUES = [];
 // Component hiển thị sub: tự đăng ký cue từ store, nên đổi cue chỉ render lại chính nó.
 const SubtitleLayer = React.memo(function SubtitleLayer({ meta, rect, secondaryOn, controlsHidden, saved, hover, onGrab, onWord }) {
@@ -231,30 +228,6 @@ const SubtitleLayer = React.memo(function SubtitleLayer({ meta, rect, secondaryO
     onWord
   }) || null;
 });
-
-
-// Vị trí dọc của sub native (% chiều cao hình, tính từ trên xuống). 90 = mép dưới sub ở 80% chiều cao.
-const CUE_BOTTOM_PERCENT = 80;
-// Cue có \pos/\move: JS sẽ vẽ đúng vị trí, nên giữ text gốc trong _posText và để trống text của track native
-// (tránh vẽ hai lần). Các cue khác giữ nguyên để trình duyệt (::cue) vẽ.
-const normalizePosCues = (track) => {
-  const BS = String.fromCharCode(92);
-  for (const c of Array.from(track.cues || [])) {
-    if (c._scanned) continue;
-    c._scanned = true;
-    // Đưa cue native lên cao: mép dưới của sub nằm ở CUE_BOTTOM_PERCENT % chiều cao hình (tính từ trên xuống)
-    if ("line" in c) {
-      c.snapToLines = false;
-      c.line = CUE_BOTTOM_PERCENT;
-      c.lineAlign = "end";
-    }
-    const t = c.text || "";
-    if (t.includes(BS + "pos(") || t.includes(BS + "move(")) {
-      c._posText = t;
-      c.text = "";
-    }
-  }
-};
 
 
 // Vị trí phát tách khỏi state của Home: chỉ các thành phần hiển thị thời gian đăng ký vào đây,
@@ -548,16 +521,11 @@ const Home = (props) => {
   const popupRef = useRef({ trWord: false, boxTracks: false, boxAudio: false, boxSpeed: false, boxDelay: false, boxFont: false });
   popupRef.current = { trWord: !!trWord, boxTracks, boxAudio, boxSpeed, boxDelay, boxFont };
 
-  // Track đang được trình duyệt vẽ (::cue, chỉ TV). Mọi chỗ đặt track.mode đều tôn trọng ref này.
-  const nativeTrackRef = useRef(null);
   const playedRef = useRef(0); // tiến trình hiện tại, đọc trực tiếp cho tua (không đợi state)
-  const lastProgressSecRef = useRef(-1);
-  // Đưa mode về đúng: chỉ track native được showing, các track còn lại hidden
-  const trackModeFor = (track) => (track && track === nativeTrackRef.current ? "showing" : "hidden");
 
   if (!_.isEmpty(textTracks) && !_.isEmpty(subtitles)) {
     for (const element of textTracks) {
-      element.mode = trackModeFor(element); // phụ đề JS vẽ bằng overlay (nền đen đặc), ngoại trừ track ::cue trên TV
+      element.mode = "hidden"; // phụ đề do JS vẽ bằng overlay (nền đen đặc)
     }
   }
 
@@ -860,7 +828,7 @@ const Home = (props) => {
   const changeSubtitle = (language, noSetSub) => {
     if (textTracks && textTracks.length > 0) {
       for (const element of textTracks) {
-        element.mode = trackModeFor(element);
+        element.mode = "hidden";
       }
     }
     const newSybtitle = _.clone(subtitles);
@@ -976,18 +944,15 @@ const Home = (props) => {
     let tries = 0;
     let track = null;
     const onCueChange = () => {
-      const nativeMode = !!track && track === nativeTrackRef.current;
-      if (nativeMode) normalizePosCues(track);
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
-      const picked = nativeMode ? cues.filter((c) => c._posText) : cues;
-      const next = picked.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: (c._posText ?? c.text) || "" }));
+      const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: c.text || "" }));
       cueStore.set(sameCues(cueStore.value, next) ? cueStore.value : next);
     };
     const attach = () => {
       const videoEl = document.getElementsByTagName("video")[0];
       track = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks).find((t) => t.language === activeSubLang) : null;
       if (track) {
-        track.mode = trackModeFor(track);
+        track.mode = "hidden";
         track.addEventListener("cuechange", onCueChange);
         onCueChange();
       } else if (tries++ < 120) {
@@ -1074,7 +1039,7 @@ const Home = (props) => {
         applySubDelay(subDelay); // áp độ trễ + kéo dài trước, để danh sách cue khớp thời gian đang hiển thị
         setCueList(
           Array.from(track.cues)
-            .map((c) => ({ start: c.startTime, end: c.endTime, text: cleanCueText(c._posText ?? c.text) }))
+            .map((c) => ({ start: c.startTime, end: c.endTime, text: cleanCueText(c.text) }))
             .filter((c) => c.text)
         );
         lastCueRef.current = -2;
@@ -1089,44 +1054,6 @@ const Home = (props) => {
   // So sánh gap theo trường (không dùng JSON.stringify mỗi tick)
   const sameCues = (a, b) =>
     a === b || (a.length === b.length && a.every((c, i) => c.key === b[i].key && c.id === b[i].id && c.text === b[i].text));
-  const sameGap = (a, b) => a === b || (!!a && !!b && a.next === b.next && a.p === b.p);
-
-  // Sub không có vị trí (\pos / \move) và không có sub thứ 2: để trình duyệt vẽ bằng ::cue, không dựng lớp JS
-  const [nativeSub, setNativeSub] = useState(false);
-  useEffect(() => {
-    if (!USE_NATIVE_CUE) return;
-    setNativeSub(false);
-    if (type !== "file" || !activeSubLang || secLang || audioOnly || isMouse) return; // chỉ TV dùng ::cue; PC/điện thoại vẫn dựng bằng JS
-    let timer;
-    let tries = 0;
-    let track = null;
-    let native = false;
-    const check = () => {
-      const videoEl = document.getElementsByTagName("video")[0];
-      track = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks).find((t) => t.language === activeSubLang) : null;
-      if (!track) {
-        if (tries++ < 120) timer = setTimeout(check, 500);
-        return;
-      }
-      if (track.mode === "disabled") track.mode = "hidden"; // hidden để trình duyệt tải cue
-      if (!track.cues || !track.cues.length) {
-        if (tries++ < 120) timer = setTimeout(check, 500);
-        return;
-      }
-      normalizePosCues(track);
-      native = true;
-      nativeTrackRef.current = track;
-      track.mode = trackModeFor(track);
-      setNativeSub(native);
-    };
-    check();
-    return () => {
-      clearTimeout(timer);
-      if (native) nativeTrackRef.current = null;
-      if (track && native) track.mode = "hidden"; // tắt sub / đổi sub: không để ::cue còn vẽ
-      setNativeSub(false);
-    };
-  }, [activeSubLang, pathViewFile, secLang, audioOnly, type, isMouse]);
 
   // Theo dõi thời gian video -> highlight cue hiện tại và cuộn tới nó
   useEffect(() => {
@@ -1495,9 +1422,6 @@ const Home = (props) => {
     "--font-size": sizeW ? Math.round(Math.min(Math.max(sizeW / 90, touch ? 13 : 11), 26)) + "px" : "12px",
     // Chiều cao tối đa của popup chọn (sub / tốc độ / audio): không cao quá khung video (chỉ nghe: khung rất thấp nên cho tối đa 230px, popup mở lên trên)
     "--menu-max-h": audioOnly ? "230px" : videoH ? Math.max(videoH - barPx - 16, 80) + "px" : "70vh",
-    "--font-size-subtitle": videoW ? Math.max(videoW / 36, 14) + "px" : "24px",
-    // Font sub người dùng chọn: ::cue (native trên TV) đọc biến này
-    "--font-family-subtitle": getSubFontFamily(),
     // Tiêu đề video co giãn theo độ rộng khung video
     "--font-size-title": titlePx + "px"
   };

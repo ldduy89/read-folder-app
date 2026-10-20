@@ -15,20 +15,6 @@ body {
   font-style: normal;
   font-display: swap;
 }
-.react-player video::cue{
-  font-size: var(--font-size-subtitle);
-  font-weight: 700;
-  font-family: var(--font-family-subtitle, "Varela Round", Helvetica, Arial, sans-serif);
-  background-color: #000;
-  color:#ffcc00;
-  position:absolute;
-  top: 1px;
- }
-/* Chrome/Safari vẽ thêm lớp nền mờ (rgba(0,0,0,.8)) phía sau cue -> ép đen đặc */
-.react-player video::-webkit-media-text-track-display-backdrop{
-  background-color: #000 !important;
-  background: #000 !important;
-}
  .subtitle-track {
   width: 50%
  }
