@@ -425,3 +425,26 @@ img {
   height: 1.4em;
   flex: none;
 }
+
+/* Cả dòng file/thư mục đều bấm được: link phủ kín dòng (Pick vẫn bấm riêng được) */
+.App-item {
+  position: relative;
+}
+.App-item > a.row-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.App-item > button {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hover cả dòng file/thư mục */
+.App-item {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.App-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}

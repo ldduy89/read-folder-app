@@ -2155,7 +2155,7 @@ const Home = (props) => {
                       src={folder.type === "file" ? fileIcon : folderIcon}
                       alt="icon"
                     />
-                    <Link to={`/${fullPath}${folder.type === "file" ? "?type=file" : ""}`}>{folder.name}</Link>
+                    <Link className="row-link" to={`/${fullPath}${folder.type === "file" ? "?type=file" : ""}`}>{folder.name}</Link>
                     {/* Home: ổ đĩa không có nút, thư mục đã pick có nút "Bỏ pick". Trong thư mục: thư mục con có nút Pick. TV (remote) không hiện nút. */}
                     {isMouse && folder.type === "folder" && (root !== "" || folder.picked) && (
                       <button
