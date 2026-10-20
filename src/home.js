@@ -54,6 +54,13 @@ import {
 import { Link, useHistory } from "react-router-dom";
 import { HiArrowsPointingIn, HiArrowsPointingOut } from "react-icons/hi2";
 
+// Danh sách trong thư mục: thư mục lên trước, file sau (giữ thứ tự của server trong mỗi nhóm)
+const foldersFirst = (list) => [
+  ...list.filter((d) => d.type !== "file"),
+  ...list.filter((d) => d.type === "file"),
+];
+
+
 // Cuộn chỉ khung danh sách có thanh cuộn (không cuộn cả trang), để phần tử nằm giữa khung
 const centerInScroll = (el) => {
   const isScrollable = (n) => {
@@ -596,7 +603,7 @@ const Home = (props) => {
     if (type !== "file") {
       fetch(publicURL + fullPathRoot.join("/"))
         .then((response) => response.json())
-        .then((data) => setFolders(data));
+        .then((data) => setFolders(foldersFirst(data)));
     } else {
       getSubtitles();
       getAudioList();
@@ -2019,7 +2026,7 @@ const Home = (props) => {
       >
         <div className="flex min-h-screen flex-col items-center justify-start text-[calc(10px+2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:overflow-x-clip">
           <div
-            className="mx-auto box-border w-250 max-w-full text-left text-[20px] max-[800px]:h-auto max-[800px]:w-full max-[800px]:overflow-visible max-[800px]:px-3 max-[800px]:pt-3 max-[800px]:pb-8 max-[800px]:text-[16px]"
+            className="w-full max-w-250 mx-auto box-border text-left text-[20px] max-[800px]:h-auto max-[800px]:w-full max-[800px]:overflow-visible max-[800px]:px-3 max-[800px]:pt-3 max-[800px]:pb-8 max-[800px]:text-[16px]"
             id="body"
             style={isMouse && type === "file" ? { width: "96vw", maxWidth: "1800px", height: "auto", overflow: "visible" } : undefined}
           >

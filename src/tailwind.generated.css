@@ -122,9 +122,6 @@
 .h-10 {
   height: calc(var(--spacing) * 10);
 }
-.h-\[900px\] {
-  height: 900px;
-}
 .h-auto {
   height: auto;
 }
@@ -161,14 +158,14 @@
 .w-\[90px\] {
   width: 90px;
 }
-.w-\[1000px\] {
-  width: 1000px;
-}
 .w-\[var\(--width-bar\)\] {
   width: var(--width-bar);
 }
 .w-full {
   width: 100%;
+}
+.max-w-250 {
+  max-width: calc(var(--spacing) * 250);
 }
 .max-w-\[calc\(100vw-20px\)\] {
   max-width: calc(100vw - 20px);
@@ -489,6 +486,9 @@
 }
 .text-\[20px\] {
   font-size: 20px;
+}
+.text-\[calc\(10px\+2vmin\)\] {
+  font-size: calc(10px + 2vmin);
 }
 .text-\[calc\(10px_\+_2vmin\)\] {
   font-size: calc(10px + 2vmin);
