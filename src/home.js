@@ -57,16 +57,37 @@ import { HiArrowsPointingIn, HiArrowsPointingOut } from "react-icons/hi2";
 
 // Cuộn chỉ khung danh sách có thanh cuộn (không cuộn cả trang), để phần tử nằm giữa khung
 const centerInScroll = (el) => {
+  const isScrollable = (n) => {
+    const oy = getComputedStyle(n).overflowY;
+    return (oy === "auto" || oy === "scroll") && n.scrollHeight > n.clientHeight;
+  };
+  const docEl = document.scrollingElement || document.documentElement;
+  const docScrollable = docEl.scrollHeight > docEl.clientHeight;
+  // Khung cuộn trong cùng chứa file (nếu có)
   let p = el.parentElement;
-  while (p && p !== document.body) {
-    const oy = getComputedStyle(p).overflowY;
-    if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) break;
-    p = p.parentElement;
+  while (p && p !== document.body && !isScrollable(p)) p = p.parentElement;
+  if (p && p !== document.body) {
+    const pr = p.getBoundingClientRect();
+    const er = el.getBoundingClientRect();
+    p.scrollTop += er.top + er.height / 2 - (pr.top + pr.height / 2);
+  } else if (docScrollable) {
+    // Không có khung cuộn riêng: thẻ body/trang là thứ đang cuộn -> căn file giữa màn hình
+    const r = el.getBoundingClientRect();
+    docEl.scrollTop += r.top + r.height / 2 - window.innerHeight / 2;
+    return;
   }
-  if (!p || p === document.body) return;
-  const pr = p.getBoundingClientRect();
-  const er = el.getBoundingClientRect();
-  p.scrollTop += er.top + er.height / 2 - (pr.top + pr.height / 2);
+  // Các khung cuộn cha khác: chỉ cuộn nếu file nằm ngoài vùng nhìn của khung đó
+  for (let q = p ? p.parentElement : el.parentElement; q && q !== document.body; q = q.parentElement) {
+    if (!isScrollable(q)) continue;
+    const qr = q.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.top < qr.top || r.bottom > qr.bottom) el.scrollIntoView({ block: "nearest" });
+  }
+  // Cuối cùng: nếu file vẫn nằm ngoài màn hình thì cuộn trang để đưa về giữa
+  const r2 = el.getBoundingClientRect();
+  if (docScrollable && (r2.top < 0 || r2.bottom > window.innerHeight)) {
+    docEl.scrollTop += r2.top + r2.height / 2 - window.innerHeight / 2;
+  }
 };
 
 
@@ -1183,6 +1204,7 @@ const Home = (props) => {
     if (!player) return;
     const target = Math.max(cue.start, 0) + 0.01;
     player.seekTo(target, "seconds");
+    scheduleSeekSave();
     setStateElm({ playing: true, ...(state.duration > 0 ? { played: target / state.duration } : {}) }); // tua xong thì phát luôn nếu đang dừng
     markSeek();
   };
@@ -1228,6 +1250,7 @@ const Home = (props) => {
     const target = Math.max(cue.start, 0) + 0.01;
     loopSinceRef.current = Date.now();
     player.seekTo(target, "seconds");
+    scheduleSeekSave();
     setLoopIndex(i);
     setStateElm({ playing: true, ...(state.duration > 0 ? { played: target / state.duration } : {}) });
   };
@@ -1548,6 +1571,7 @@ const Home = (props) => {
   const handleSeekMouseUp = (e) => {
     setStateElm({ seeking: false, played: state.seekingLine, playing: true }); // tua xong thì phát luôn nếu đang dừng
     playerRef.current?.seekTo(parseFloat(state.seekingLine * state.duration), "seconds");
+    scheduleSeekSave();
     markSeek();
   };
 
@@ -1556,6 +1580,7 @@ const Home = (props) => {
     newSeconds = newSeconds > 0 ? newSeconds : 0;
     setStateElm({ played: newSeconds / state.duration, playing: true }); // tua xong thì phát luôn nếu đang dừng
     playerRef.current?.seekTo(newSeconds, "seconds");
+    scheduleSeekSave();
     markSeek();
   };
 
@@ -1728,6 +1753,7 @@ const Home = (props) => {
     const max = state.duration > 0 ? Math.max(state.duration - 1, 0) : Infinity;
     const target = Math.min(Math.max(current + delta, 0), max);
     player.seekTo(target, "seconds");
+    scheduleSeekSave();
     setStateElm({ playing: true, ...(state.duration > 0 ? { played: target / state.duration } : {}) }); // tua xong thì phát luôn nếu đang dừng
     markSeek();
   };
@@ -2020,6 +2046,31 @@ const Home = (props) => {
   // Lớp phụ đề: chỉ dựng lại khi cue / sub / vị trí khung / trạng thái liên quan đổi (không dựng lại mỗi lần onProgress)
   const onWordRef = useRef(null);
   const resumeSaveAtRef = useRef(0);
+  // Lưu vị trí xem dở sau khi tua: đợi 3 giây không tua nữa mới lưu vị trí hiện tại,
+  // rồi tính lại mốc 15 giây cho lần lưu định kỳ.
+  const seekSavePendingRef = useRef(null);
+  const pathViewRef = useRef(pathViewFile);
+  pathViewRef.current = pathViewFile;
+  const flushSeekSave = () => {
+    const pending = seekSavePendingRef.current;
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    seekSavePendingRef.current = null;
+    pending.run();
+  };
+  const scheduleSeekSave = () => {
+    if (seekSavePendingRef.current) clearTimeout(seekSavePendingRef.current.timer);
+    const run = () => {
+      const player = playerRef.current;
+      if (!player || !pathViewRef.current) return;
+      const t = player.getCurrentTime() || 0;
+      if (t < 1 || playedRef.current >= RESUME_MAX_FRACTION) return;
+      resumeSaveAtRef.current = Date.now();
+      setResume(pathViewRef.current, t);
+    };
+    seekSavePendingRef.current = { timer: setTimeout(flushSeekSave, 3000), run };
+  };
+  useEffect(() => () => flushSeekSave(), []);
   onWordRef.current = openTranslate;
   const controlsHidden = hide && state.playing;
   // Callback ổn định (đọc qua ref) để SubtitleLayer memo không render lại vô ích
@@ -2042,9 +2093,9 @@ const Home = (props) => {
           }
         }}
       >
-        <header className="flex min-h-screen flex-col items-center justify-start bg-[#282c34] text-[calc(10px_+_2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:overflow-x-clip">
+        <div className="flex min-h-screen flex-col items-center justify-start text-[calc(10px+2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:overflow-x-clip">
           <div
-            className="mx-auto box-border w-[1000px] max-w-full overflow-auto text-left text-[20px] h-[900px] max-[800px]:h-auto max-[800px]:w-full max-[800px]:overflow-visible max-[800px]:px-3 max-[800px]:pt-3 max-[800px]:pb-8 max-[800px]:text-[16px]"
+            className="mx-auto box-border w-250 max-w-full text-left text-[20px] max-[800px]:h-auto max-[800px]:w-full max-[800px]:overflow-visible max-[800px]:px-3 max-[800px]:pt-3 max-[800px]:pb-8 max-[800px]:text-[16px]"
             id="body"
             style={isMouse && type === "file" ? { width: "96vw", maxWidth: "1800px", height: "auto", overflow: "visible" } : undefined}
           >
@@ -2877,7 +2928,7 @@ const Home = (props) => {
               </div>
             )}
           </div>
-        </header>
+        </div>
       </div>
     </>
   );
