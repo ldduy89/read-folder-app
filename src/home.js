@@ -55,6 +55,21 @@ import {
 import { Link, useHistory } from "react-router-dom";
 import { HiArrowsPointingIn, HiArrowsPointingOut } from "react-icons/hi2";
 
+// Cuộn chỉ khung danh sách có thanh cuộn (không cuộn cả trang), để phần tử nằm giữa khung
+const centerInScroll = (el) => {
+  let p = el.parentElement;
+  while (p && p !== document.body) {
+    const oy = getComputedStyle(p).overflowY;
+    if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) break;
+    p = p.parentElement;
+  }
+  if (!p || p === document.body) return;
+  const pr = p.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  p.scrollTop += er.top + er.height / 2 - (pr.top + pr.height / 2);
+};
+
+
 // Cue đang hiển thị được giữ trong store (không phải state của Home): đổi cue không làm Home render lại.
 const makeCueStore = (init = []) => ({
   value: init,
@@ -325,8 +340,6 @@ const Home = (props) => {
     })(),
     loop: false
   };
-
-console.log('sdaadad');
 
   const [folders, setFolders] = useState([]);
   const [filesOfParent, setFilesOfParent] = useState([]);
@@ -639,7 +652,7 @@ console.log('sdaadad');
     const nextFile = document.getElementById(`file_${indexFile}`);
     if (nextFile) {
       nextFile.classList.add("f-active");
-      nextFile.scrollIntoView();
+      centerInScroll(nextFile); // giữ file đang focus ở giữa danh sách, không cuộn cả trang
     }
     const playFile = document.getElementById(`play_${indexFile}`);
     if (playFile) {
@@ -1354,6 +1367,15 @@ console.log('sdaadad');
 
   // Vùng hình video thật sự hiển thị (trừ viền đen khi khác tỉ lệ khung) — toạ độ ASS tính theo vùng này
   const [picRect, setPicRect] = useState(null);
+  // Đổi file hoặc tua sang video khác: xóa vị trí và sub của video cũ để không canh sai
+  useEffect(() => {
+    setPicRect(null);
+    cueStore.set(EMPTY_CUES);
+    cueStore2.set(EMPTY_CUES);
+    cueIndexStore.set(-1);
+    gapStore.set(null);
+  }, [pathViewFile]);
+
   useEffect(() => {
     const calc = () => {
       const frame = document.getElementById("sample_video");
@@ -1384,40 +1406,41 @@ console.log('sdaadad');
       );
     };
     calc();
-    // Video có thể được tạo sau: chỉ poll cho tới khi thấy thẻ video, rồi nghe loadedmetadata (đổi độ phân giải) thay vì poll mãi
+    // Thẻ video có thể bị tạo lại khi đổi file hoặc tua: kiểm tra mỗi giây, chỉ làm việc khi thẻ hoặc khung đổi
     let vid = null;
-    let pollId = null;
+    let obsFrame = null;
     let ro = null;
-    const frameEl = () => document.getElementById("sample_video");
-    const observe = () => {
-      if (!ro) return;
-      const f = frameEl();
-      if (f) ro.observe(f); // khung đổi kích thước (cửa sổ, panel bên cạnh, toàn màn hình) -> đo lại vùng hình
-      if (vid) ro.observe(vid);
-    };
     const hasRO = typeof ResizeObserver !== "undefined";
+    const frameEl = () => document.getElementById("sample_video");
+    const onVidEvent = () => calc();
+    // Chỉ các sự kiện báo đổi nguồn video (không gồm playing/loadeddata để tua không đo lại)
+    const VID_EVENTS = ["loadedmetadata", "emptied", "resize"];
     if (hasRO) ro = new ResizeObserver(() => calc());
-    const attachVideo = () => {
-      vid = document.getElementsByTagName("video")[0] || null;
-      if (vid) vid.addEventListener("loadedmetadata", calc);
-      observe();
-      return !!vid;
+    const bindVideo = () => {
+      const cur = document.getElementsByTagName("video")[0] || null;
+      const f = frameEl();
+      if (cur === vid && f === obsFrame) return;
+      if (cur !== vid) {
+        if (vid) VID_EVENTS.forEach((ev) => vid.removeEventListener(ev, onVidEvent));
+        vid = cur;
+        if (vid) VID_EVENTS.forEach((ev) => vid.addEventListener(ev, onVidEvent));
+      }
+      obsFrame = f;
+      if (ro) {
+        ro.disconnect();
+        if (f) ro.observe(f);
+        if (vid) ro.observe(vid);
+      }
+      calc();
     };
-    if (!attachVideo()) {
-      pollId = setInterval(() => {
-        if (attachVideo()) {
-          clearInterval(pollId);
-          pollId = null;
-          calc();
-        }
-      }, 500);
-    }
+    bindVideo();
+    const pollId = setInterval(bindVideo, 1000);
     // Fallback cho trình duyệt TV cũ không có ResizeObserver
     if (!hasRO) window.addEventListener("resize", calc);
     return () => {
       clearInterval(pollId);
       if (ro) ro.disconnect();
-      if (vid) vid.removeEventListener("loadedmetadata", calc);
+      if (vid) VID_EVENTS.forEach((ev) => vid.removeEventListener(ev, onVidEvent));
       if (!hasRO) window.removeEventListener("resize", calc);
     };
   }, [frameW, frameH, pathViewFile]);
