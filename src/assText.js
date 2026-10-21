@@ -83,6 +83,7 @@ export const parseAssCue = (rawText, style, styles) => {
   let cur = { ...base };
   let pos = null;
   let an = null;
+  let fad = null;
   let drawing = false;
   let lines = [[]];
   let buf = "";
@@ -102,6 +103,8 @@ export const parseAssCue = (rawText, style, styles) => {
       an = parseInt(m[1], 10);
     } else if ((m = /^a(\d+)$/.exec(t))) {
       if (LEGACY_AN[m[1]]) an = LEGACY_AN[m[1]];
+    } else if ((m = /^fad\(\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(t))) {
+      fad = { in: parseInt(m[1], 10), out: parseInt(m[2], 10) };
     } else if ((m = /^fs(\d+(?:\.\d+)?)$/.exec(t))) {
       cur.fs = parseFloat(m[1]);
     } else if (t === "fs") {
@@ -179,7 +182,13 @@ export const parseAssCue = (rawText, style, styles) => {
   while (lines.length && !lines[lines.length - 1].length) lines.pop();
   lines = lines.map((l) => (l.length ? l : [{ text: "\u00a0", ...base }]));
 
-  return { pos, an, lines };
+  return { pos, an, lines, fad };
+};
+
+// Thời gian mờ ra (ms) của cue có \fad; 0 nếu không có
+export const fadeOutMs = (rawText) => {
+  const f = parseAssCue(rawText, DEFAULT_ASS_STYLE, null).fad;
+  return f && f.out > 0 ? f.out : 0;
 };
 
 // Văn bản thuần của cue (dùng cho khung danh sách phụ đề)

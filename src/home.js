@@ -7,7 +7,7 @@ import ReactPlayer from "react-player";
 import { getResume, setResume, clearResume, pruneResumeInFolder, RESUME_MAX_FRACTION } from "./resumePosition";
 import _ from "lodash";
 import Duration from "./Duration";
-import { plainCueText } from "./assText";
+import { plainCueText, fadeOutMs } from "./assText";
 import {
   buildAssLayer,
   buildSavedMatcher,
@@ -223,7 +223,7 @@ function useStoreValue(store) {
 
 const EMPTY_CUES = [];
 // Component hiển thị sub: tự đăng ký cue từ store, nên đổi cue chỉ render lại chính nó.
-const SubtitleLayer = React.memo(function SubtitleLayer({ meta, rect, secondaryOn, controlsHidden, saved, hover, onGrab, onWord }) {
+const SubtitleLayer = React.memo(function SubtitleLayer({ meta, rect, secondaryOn, controlsHidden, saved, hover, onGrab, onWord, getTime }) {
   const cues = useStoreValue(cueStore);
   const cues2 = useStoreValue(cueStore2);
   return buildAssLayer(cues, meta, rect, {
@@ -232,7 +232,8 @@ const SubtitleLayer = React.memo(function SubtitleLayer({ meta, rect, secondaryO
     onGrab,
     saved,
     hover,
-    onWord
+    onWord,
+    getTime
   }) || null;
 });
 
@@ -952,8 +953,19 @@ const Home = (props) => {
     let track = null;
     const onCueChange = () => {
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
-      const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: c.text || "" }));
-      cueStore.set(sameCues(cueStore.value, next) ? cueStore.value : next);
+      const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, id: c.id, text: c.text || "", start: c.startTime, end: c.endTime }));
+      // Cue vừa kết thúc có \fad: giữ thêm đúng thời gian mờ ra (cue vẫn đậm đến lúc kết thúc, không bật lại)
+      const prev = cueStore.value;
+      const prevActive = prev.filter((x) => !x.leaving);
+      const leaving = prevActive
+        .filter((p) => !next.some((n) => n.key === p.key && n.id === p.id))
+        .map((p) => ({ ...p, leaving: true, leaveId: `${p.key}|${p.id}|${Math.random()}`, fadeMs: fadeOutMs(p.text) }))
+        .filter((x) => x.fadeMs > 0);
+      leaving.forEach((x) =>
+        setTimeout(() => cueStore.set(cueStore.value.filter((y) => y.leaveId !== x.leaveId)), x.fadeMs)
+      );
+      const merged = [...next, ...prev.filter((x) => x.leaving), ...leaving];
+      cueStore.set(sameCues(prev, merged) ? prev : merged);
     };
     const attach = () => {
       const videoEl = document.getElementsByTagName("video")[0];
@@ -997,7 +1009,7 @@ const Home = (props) => {
     let track = null;
     const onCueChange = () => {
       const cues = track && track.activeCues ? Array.from(track.activeCues) : [];
-      const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, text: c.text || "" }));
+      const next = cues.map((c) => ({ key: `${c.startTime}-${c.endTime}`, text: c.text || "", start: c.startTime, end: c.endTime }));
       cueStore2.set(sameCues(cueStore2.value, next) ? cueStore2.value : next);
     };
     const attach = () => {
@@ -1060,7 +1072,7 @@ const Home = (props) => {
 
   // So sánh gap theo trường (không dùng JSON.stringify mỗi tick)
   const sameCues = (a, b) =>
-    a === b || (a.length === b.length && a.every((c, i) => c.key === b[i].key && c.id === b[i].id && c.text === b[i].text));
+    a === b || (a.length === b.length && a.every((c, i) => c.key === b[i].key && c.id === b[i].id && c.text === b[i].text && c.leaveId === b[i].leaveId));
 
   // Theo dõi thời gian video -> highlight cue hiện tại và cuộn tới nó
   useEffect(() => {
@@ -2006,6 +2018,7 @@ const Home = (props) => {
   const controlsHidden = hide && state.playing;
   // Callback ổn định (đọc qua ref) để SubtitleLayer memo không render lại vô ích
   const grabStable = React.useCallback(() => playingRef.current && setStateElmRef.current({ playing: false }), []);
+  const getTimeStable = React.useCallback(() => (playerRef.current ? playerRef.current.getCurrentTime() || 0 : 0), []);
   const wordStable = React.useCallback((text, anchor, meta) => onWordRef.current && onWordRef.current(text, anchor, meta), []);
 
   return (
@@ -2300,6 +2313,7 @@ const Home = (props) => {
                         hover={isMouse && !touch}
                         onGrab={grabStable}
                         onWord={wordStable}
+                        getTime={getTimeStable}
                       />
                     )}
                     {fsSide && !_.isEmpty(subtitles) && (

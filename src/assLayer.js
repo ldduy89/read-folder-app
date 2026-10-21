@@ -529,6 +529,15 @@ const SUB_BAR_GAP_RATIO = 0.025;
 // Chỉ áp dụng cho video 16:9: nâng sub bottom lên thêm một khoảng theo tỉ lệ chiều cao hình. Tăng số này để sub cao hơn.
 const SUB_LIFT_16_9_RATIO = 0.03;
 
+// Hiệu ứng \fad(in,out): phần mờ vào chạy trong cue (lệch theo thời điểm đang phát để vào giữa cue vẫn đúng)
+const fadeInCss = (fad, start, now) => {
+  if (!fad || !(fad.in > 0)) return null;
+  const elapsedMs = Math.max(0, (now - start) * 1000);
+  return { animation: `subFadeIn ${fad.in}ms linear ${Math.round(-elapsedMs)}ms backwards` };
+};
+// Cue đã kết thúc nhưng còn mờ ra: fade-out chạy từ độ đậm đầy đủ lúc kết thúc
+const fadeOutNow = (fad) => (fad && fad.out > 0 ? { animation: `subFadeOut ${fad.out}ms linear 0ms both` } : null);
+
 export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
   if (!pic || !pic.width || !pic.height) return null;
   liveCues = liveCues || [];
@@ -556,6 +565,8 @@ export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
     const style = { ...DEFAULT_ASS_STYLE, ...(found || {}) };
     const parsed = parseAssCue(c.text, style, hasStyles ? styles : null);
     if (!parsed.lines.length) return;
+    const now = opts.getTime ? opts.getTime() : c.start;
+    const fade = c.leaving ? fadeOutNow(parsed.fad) : fadeInCss(parsed.fad, c.start, now);
 
     const an = parsed.an || style.alignment || 2;
     const col = (an - 1) % 3; // 0 trái, 1 giữa, 2 phải
@@ -575,7 +586,7 @@ export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
           picH={pic.height}
           zIndex={m.layer || 0}
         >
-          {renderLines(parsed, sx, resX, col, false, opts.saved, key)}
+          <div style={fade || undefined}>{renderLines(parsed, sx, resX, col, false, opts.saved, key)}</div>
         </PositionedCue>
       );
       return;
@@ -584,7 +595,7 @@ export const buildAssLayer = (liveCues, assMeta, pic, opts = {}) => {
     // Không có \pos: xếp theo alignment + margin; các dòng cùng vị trí xếp chồng lên nhau
     const g = groups[an] || (groups[an] = { col, row, style, m, nodes: [] });
     g.nodes.push(
-      <div key={key} style={{ textAlign: H_ALIGN[col] }}>
+      <div key={key} style={{ textAlign: H_ALIGN[col], ...(fade || {}) }}>
         {renderLines(parsed, sx, resX, col, true, opts.saved, key)}
       </div>
     );
