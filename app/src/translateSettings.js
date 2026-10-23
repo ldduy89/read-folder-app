@@ -34,7 +34,7 @@ const Settings = ({ apiBase }) => {
     load();
   }, []);
 
-  if (cfg === false) return <div className="settings err">Không kết nối được máy chủ (cổng 8081).</div>;
+  if (cfg === false) return <div className="settings err">Không kết nối được máy chủ (cổng 80).</div>;
   if (!cfg) return <div className="settings">Đang tải…</div>;
 
   const post = (path, body) => apiPost(apiBase, path, body).catch(() => ({ ok: false, error: "Không kết nối được máy chủ." }));

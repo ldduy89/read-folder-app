@@ -60,7 +60,7 @@ const C = {
 
 /**
  * props:
- *  apiBase: "http://host:8081"
+ *  apiBase: "http://host:80"
  *  text:    đoạn cần dịch
  *  anchor:  { x, y, top } vị trí từ trên màn hình (y = mép dưới, top = mép trên) để đặt cửa sổ
  *  onClose: đóng cửa sổ
@@ -112,7 +112,7 @@ const TranslatePopup = ({ apiBase, text, anchor, hoverId, onClose }) => {
         }
         finish(r);
       })
-      .catch(() => finish({ ok: false, error: "Không kết nối được máy chủ dịch (cổng 8081)." }));
+      .catch(() => finish({ ok: false, error: "Không kết nối được máy chủ dịch (cổng 80)." }));
     return () => {
       alive = false;
     };

@@ -1,5 +1,5 @@
 @echo off
-REM Build app -> copy build sang api -> chạy server (cổng 8081)
+REM Build app -> copy build sang api -> chạy server (cổng 80)
 REM Cách dùng (chạy từ thư mục gốc chứa api\ và app\):
 REM   run.bat            : cài thư viện (nếu thiếu), build app, copy, chạy server
 REM   run.bat build      : chỉ build app + copy sang api (không chạy server)
@@ -81,7 +81,7 @@ findstr /C:"APP_BUILD" "%API%\server.js" >nul 2>nul
 if errorlevel 1 (echo LOI: api\server.js chua co khoi giao dien React. Copy server.js tu thu muc combined vao api\. & exit /b 1)
 if not exist "%API%\build\index.html" (echo LOI: Chua co api\build. Chay "run.bat build" truoc. & exit /b 1)
 echo.
-echo ==^> Chay server tai http://localhost:8081 ^(Ctrl+C de dung^)
+echo ==^> Chay server tai http://localhost:80 ^(Ctrl+C de dung^)
 pushd "%API%" && node server.js
 popd
 exit /b %ERRORLEVEL%

@@ -663,7 +663,7 @@ app.get("/subtitles-style/*", function (req, res) {
 
 require("./translate")(app); // /translate, /tts (dịch + giọng đọc)
 
-// ---- Giao diện React (build) chạy chung cổng 8081 ----
+// ---- Giao diện React (build) chạy chung cổng 80 ----
 // Thư mục build của app (npm run build) nằm cạnh server.js, tên "build".
 // Route API ở trên đã được xử lý trước; còn lại là file tĩnh của React hoặc đường dẫn SPA.
 const APP_BUILD = require("path").join(__dirname, "build");
@@ -682,7 +682,7 @@ app.use((err, req, res, next) => {
   res.status(err && (err.status || err.statusCode) ? err.status || err.statusCode : 500).send({ error: "Loi server" });
 });
 
-const server = app.listen(8081, function () {
+const server = app.listen(80, function () {
   const host = server.address().address;
   const port = server.address().port;
   console.log("Ung dung Node.js dang lang nghe tai dia chi: http://%s:%s", host, port);

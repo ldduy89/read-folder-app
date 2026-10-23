@@ -311,14 +311,14 @@ const Home = (props) => {
 
   const queryParams = new URLSearchParams(window.location.search);
   const type = queryParams.get("type");
-  const publicURL = `http://${hostname}:8081/public/`;
-  const subtitlesURL = `http://${hostname}:8081/subtitles/`;
-  const subtitlesStyleURL = `http://${hostname}:8081/subtitles-style/`;
-  const trasksURL = `http://${hostname}:8081/trasks/`;
-  const pickURL = `http://${hostname}:8081/pick/`;
-  const audiosURL = `http://${hostname}:8081/audios/`;
-  const mediaPrepareURL = `http://${hostname}:8081/media-prepare/`;
-  const mediaURL = `http://${hostname}:8081/media-file/`;
+  const publicURL = `http://${hostname}:80/public/`;
+  const subtitlesURL = `http://${hostname}:80/subtitles/`;
+  const subtitlesStyleURL = `http://${hostname}:80/subtitles-style/`;
+  const trasksURL = `http://${hostname}:80/trasks/`;
+  const pickURL = `http://${hostname}:80/pick/`;
+  const audiosURL = `http://${hostname}:80/audios/`;
+  const mediaPrepareURL = `http://${hostname}:80/media-prepare/`;
+  const mediaURL = `http://${hostname}:80/media-file/`;
   const sample_video = document.getElementById("sample_video");
   const video = document.getElementsByTagName("video")[0];
   const textTracks = _.get(video, "textTracks", null);
@@ -2354,7 +2354,7 @@ const Home = (props) => {
                     {trWord && !audioOnly && (
                       <TranslatePopup
                         key={trWord.id}
-                        apiBase={`http://${hostname}:8081`}
+                        apiBase={`http://${hostname}:80`}
                         text={trWord.text}
                         anchor={trWord.anchor}
                         hoverId={trWord.hoverId}
@@ -2863,7 +2863,7 @@ const Home = (props) => {
                 {audioOnly && trWord && (
                   <TranslatePopup
                     key={trWord.id}
-                    apiBase={`http://${hostname}:8081`}
+                    apiBase={`http://${hostname}:80`}
                     text={trWord.text}
                     anchor={trWord.anchor}
                     hoverId={trWord.hoverId}

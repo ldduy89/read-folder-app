@@ -2,7 +2,7 @@
 export const TARGET_KEY = "cctTarget"; // ngôn ngữ đích, mặc định "vi"
 export const WORDS_KEY = "cctWords"; // danh sách từ đã lưu
 
-export const apiBaseOf = () => `http://${window.location.hostname}:8081`;
+export const apiBaseOf = () => `http://${window.location.hostname}:80`;
 
 export const getTarget = () => {
   try {
@@ -59,7 +59,7 @@ export const syncNow = async (apiBase) => {
     if (localOnly.length) await syncOps(apiBase, localOnly.map((w) => ({ action: "add", word: w })));
     return { ok: true, pulled, pushed: localOnly.length, total: remote.length + localOnly.length };
   } catch (e) {
-    return { ok: false, error: "Không kết nối được máy chủ (cổng 8081)." };
+    return { ok: false, error: "Không kết nối được máy chủ (cổng 80)." };
   }
 };
 

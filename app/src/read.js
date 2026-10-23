@@ -7,7 +7,7 @@ const Home = () => {
   let hostname = window.location.hostname;
   let rootPath = decodeURIComponent(window.location.pathname);
   const fullPathRoot = _.filter(rootPath.split("/"), (root) => !!root);
-  const readURL = `http://${hostname}:8081/`;
+  const readURL = `http://${hostname}:80/`;
   const [file, setFile] = useState([]);
 
   useLayoutEffect(() => {

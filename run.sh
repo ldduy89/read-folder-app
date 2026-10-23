@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build app -> copy build sang api -> chạy server (cổng 8081)
+# Build app -> copy build sang api -> chạy server (cổng 80)
 # Cách dùng (chạy từ thư mục gốc chứa api/ và app/):
 #   ./run.sh            : cài thư viện (nếu thiếu), build app, copy, chạy server
 #   ./run.sh build      : chỉ build app + copy sang api (không chạy server)
@@ -55,7 +55,7 @@ check_server_block() {
 start_server() {
   check_server_block
   [ -f "$API/build/index.html" ] || die "Chưa có api/build. Chạy './run.sh build' trước."
-  log "Chạy server tại http://localhost:8081 (Ctrl+C để dừng)"
+  log "Chạy server tại http://localhost:80 (Ctrl+C để dừng)"
   cd "$API"
   exec node server.js
 }
