@@ -1529,9 +1529,13 @@ const Home = (props) => {
 
   // Sau một lần tua, các sự kiện chuột/chạm ngay sau đó (click, di chuột) không được kéo thời gian ẩn về 3 giây
   const seekAtRef = useRef(0);
+  // Ref để luôn đọc đúng trạng thái ẩn/hiện, kể cả khi gọi từ phím tắt hay chạm (closure cũ)
+  const hideRef = useRef(hide);
+  hideRef.current = hide;
   const markSeek = () => {
     seekAtRef.current = Date.now();
-    handleAutoHide(null, 1000);
+    // Đang ẩn giao diện thì tua không làm hiện lại thanh điều khiển / menu tuỳ chỉnh
+    if (!hideRef.current) handleAutoHide(null, 1000);
   };
 
   const handleAutoHide = (event, delay = 3000) => {
