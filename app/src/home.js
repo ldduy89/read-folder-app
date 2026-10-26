@@ -1529,13 +1529,10 @@ const Home = (props) => {
 
   // Sau một lần tua, các sự kiện chuột/chạm ngay sau đó (click, di chuột) không được kéo thời gian ẩn về 3 giây
   const seekAtRef = useRef(0);
-  // Ref để luôn đọc đúng trạng thái ẩn/hiện, kể cả khi gọi từ phím tắt hay chạm (closure cũ)
-  const hideRef = useRef(hide);
-  hideRef.current = hide;
   const markSeek = () => {
     seekAtRef.current = Date.now();
-    // Đang ẩn giao diện thì tua không làm hiện lại thanh điều khiển / menu tuỳ chỉnh
-    if (!hideRef.current) handleAutoHide(null, 1000);
+    // Đang ẩn thanh điều khiển thì tua không hiện nó ra; chỉ làm mới bộ đếm khi đang hiện
+    if (!hide) handleAutoHide(null, 1000);
   };
 
   const handleAutoHide = (event, delay = 3000) => {
@@ -2043,7 +2040,7 @@ const Home = (props) => {
       >
         <div className="flex min-h-screen flex-col items-center justify-start text-[calc(10px+2vmin)] text-white max-[800px]:min-h-dvh max-[800px]:overflow-x-clip">
           <div
-            className="w-full max-w-250 mx-auto box-border text-left text-[20px] max-[800px]:h-auto max-[800px]:w-full max-[800px]:overflow-visible max-[800px]:px-3 max-[800px]:pt-3 max-[800px]:pb-8 max-[800px]:text-[16px]"
+            className="w-full max-w-250 mx-auto box-border pb-16 text-left text-[20px] max-[800px]:h-auto max-[800px]:w-full max-[800px]:overflow-visible max-[800px]:px-3 max-[800px]:pt-3 max-[800px]:pb-8 max-[800px]:text-[16px]"
             id="body"
             style={isMouse && type === "file" ? { width: "96vw", maxWidth: "1800px", height: "auto", overflow: "visible" } : undefined}
           >
