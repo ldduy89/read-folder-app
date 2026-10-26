@@ -19,11 +19,11 @@ export const CSS = `
 .tw .btn:disabled{opacity:.5;cursor:default}
 .tw .btn.pri{background:var(--accent);color:var(--bg)}
 .tw .btn.pri:hover{background:var(--accent);opacity:.9}
-.tw .addform{padding:10px 16px 12px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) minmax(160px,2fr) auto;gap:8px;align-items:end}
+.tw .addform{padding:10px 16px 12px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) minmax(160px,2fr) auto;gap:8px;align-items:start}
 .tw .addform label{display:grid;gap:3px;color:var(--muted);font-size:12px}
 .tw .addform input[type=text],.tw .addform textarea{width:100%;min-width:0;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit}
 .tw .addform textarea{resize:vertical;min-height:34px}
-.tw .addform .row{display:flex;gap:8px}
+.tw .addform .row{display:flex;gap:8px;padding-top:18px}
 @media (max-width:760px){.tw .addform{grid-template-columns:1fr}}
 .tw .kinds{padding:0 16px;display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:8px}
 .tw .kind{border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);cursor:pointer;padding:6px 12px;font:inherit;font-weight:600}
