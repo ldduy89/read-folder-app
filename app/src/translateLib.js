@@ -63,6 +63,29 @@ export const syncNow = async (apiBase) => {
   }
 };
 
+// ---- Gọi Google Translate trực tiếp từ trình duyệt (IP của người dùng, không qua server) ----
+// Chỉ dùng cho từ đơn. Lỗi (bị chặn, mạng...) thì trả null để gọi server như cũ.
+export const isSingleWordText = (t) => {
+  t = String(t || "").trim();
+  return t.length > 0 && t.length <= 30 && !/\s/.test(t);
+};
+export const googleDirect = async (text, target) => {
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(target)}&dt=t&dt=bd&q=${encodeURIComponent(String(text).slice(0, 5000))}`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const out = (d[0] || []).map((p) => p[0]).join("");
+    if (!out) return null;
+    const pos = (d[1] || [])
+      .map((g) => ({ pos: g[0], terms: (g[2] || []).map((t) => ({ word: t[0], score: t[3] || 0 })) }))
+      .filter((g) => g.terms.length);
+    return { ok: true, text: out, from: d[2] || "auto", to: target, via: "browser", dict: { pos } };
+  } catch (e) {
+    return null;
+  }
+};
+
 // ---- Giọng đọc ----
 // Google TTS chỉ nhận đoạn ngắn (~200 ký tự): cắt theo câu / khoảng trắng
 export const chunkText = (text, max = 180) => {

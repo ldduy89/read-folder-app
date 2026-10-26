@@ -98,6 +98,16 @@ const parseDict = (data) => ({
     .filter((g) => g.terms.length)
 });
 
+// Từ điển trong phản hồi kênh web: inner[3] = [[pos, null, [[nghĩa, [từ tiếng Anh...]], ...], gốc, điểm], ...]
+const parseWebDict = (arr) => ({
+  pos: (Array.isArray(arr) ? arr : [])
+    .map((g) => ({
+      pos: typeof g[0] === "string" ? g[0] : "",
+      terms: (Array.isArray(g[2]) ? g[2] : []).filter((t) => Array.isArray(t) && typeof t[0] === "string").map((t) => ({ word: t[0], score: 0 }))
+    }))
+    .filter((g) => g.terms.length)
+});
+
 // ---------- Kênh web của Google Translate (batchexecute): kết quả giống app ----------
 const FALLBACK_BL = "boq_translate-webserver_20261006.00_p0";
 let webParams = null;
@@ -138,7 +148,12 @@ const parseWebResponse = (raw) => {
   if (!Array.isArray(segs)) return null;
   const text = segs.map((x) => (x && typeof x[0] === "string" ? x[0] : "")).join(" ").replace(/ {2,}/g, " ").trim();
   if (!text) return null;
-  return { text, from: typeof inner[2] === "string" ? inner[2] : null };
+  const from = typeof inner[2] === "string" ? inner[2] : typeof inner[4] === "string" ? inner[4] : null;
+  let dict;
+  try {
+    dict = parseWebDict(inner[3]);
+  } catch (e) {}
+  return { text, from, dict: dict && dict.pos.length ? dict : undefined };
 };
 
 const webCall = async (text, source, target, bl, sid, at, mode) => {
@@ -302,9 +317,19 @@ const doTranslate = async (text, target, key, gemCfg) => {
     }
   }
 
+  // Từ đơn: thử kênh web trước, vì phản hồi của nó đã có từ điển theo từ loại; gtx hay bị Google chặn (429)
+  if (!/\n/.test(text) && isShort(text)) {
+    const first = await webTranslate(text, target, "auto");
+    if (first && first.dict) {
+      const out = { ok: true, text: first.text, from: first.from || "auto", to: target, via: "web", dict: first.dict };
+      remember(key, out);
+      return out;
+    }
+  }
+
   if (Date.now() < blockedUntil) {
     const web = /\n/.test(text) ? null : await webTranslate(text, target, "auto");
-    if (web) return { ok: true, text: web.text, from: web.from || "auto", to: target, via: "web" };
+    if (web) return { ok: true, text: web.text, from: web.from || "auto", to: target, via: "web", ...(web.dict ? { dict: web.dict } : {}) };
     const sec = Math.ceil((blockedUntil - Date.now()) / 1000);
     return { ok: false, blocked: true, error: `Google đang từ chối yêu cầu từ máy chủ, thử lại sau khoảng ${sec} giây.` };
   }
@@ -317,7 +342,7 @@ const doTranslate = async (text, target, key, gemCfg) => {
     // Kênh gtx hỏng: thử kênh web của Google (không có nghĩa theo từ loại) trước khi báo lỗi
     const web = /\n/.test(text) ? null : await webTranslate(text, target, "auto");
     if (web) {
-      const out = { ok: true, text: web.text, from: web.from || "auto", to: target, via: "web" };
+      const out = { ok: true, text: web.text, from: web.from || "auto", to: target, via: "web", ...(web.dict ? { dict: web.dict } : {}) };
       remember(key, out);
       return out;
     }
@@ -335,6 +360,7 @@ const doTranslate = async (text, target, key, gemCfg) => {
       out.dict = parseDict(data);
     } catch (e) {}
   }
+  if ((!out.dict || !out.dict.pos.length) && web && web.dict) out.dict = web.dict; // gtx không có từ điển -> lấy từ kênh web
   remember(key, out);
   return out;
 };

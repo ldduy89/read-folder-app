@@ -3,7 +3,7 @@
 // Server: GET {apiBase}/translate?text=&target=  và  GET {apiBase}/tts?text=&lang=  (api/translate.js)
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { hitGroup } from "./assLayer";
-import { apiGet, copyText, createSpeaker, getTarget, getWords, setWords, syncOps, wordId } from "./translateLib";
+import { apiGet, copyText, createSpeaker, getTarget, getWords, googleDirect, isSingleWordText, setWords, syncOps, wordId } from "./translateLib";
 
 // Mỗi từ loại một dòng: { label: "Tính từ", words: ["hoàn toàn", ...] }, tối đa 3 nghĩa phổ biến nhất
 const dictLines = (dict) =>
@@ -104,7 +104,8 @@ const TranslatePopup = ({ apiBase, text, anchor, hoverId, onClose }) => {
         alive = false;
       };
     }
-    apiGet(apiBase, `/translate?target=${encodeURIComponent(target)}&text=${encodeURIComponent(text.slice(0, 5000))}`)
+    (isSingleWordText(text) ? googleDirect(text, target) : Promise.resolve(null))
+      .then((d) => d || apiGet(apiBase, `/translate?target=${encodeURIComponent(target)}&text=${encodeURIComponent(text.slice(0, 5000))}`))
       .then((r) => {
         if (r.ok) {
           if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);

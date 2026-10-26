@@ -1,6 +1,6 @@
 // translateWords.js — trang "Từ đã lưu" + cài đặt dịch, mở ở /translate-words (chuyển từ words.html / options.html của extension)
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { apiBaseOf, copyText, createSpeaker, getWords, setWords, syncNow, syncOps } from "./translateLib";
+import { apiBaseOf, apiGet, copyText, createSpeaker, getTarget, getWords, googleDirect, isSingleWordText, setWords, syncNow, syncOps, wordId } from "./translateLib";
 
 export const CSS = `
 .tw{--bg:#fff;--fg:#202124;--muted:#5f6368;--line:#e3e5e8;--hover:#f3f7fd;--head:#f8f9fa;--accent:#1a73e8;min-height:100vh;background:var(--bg);color:var(--fg);font:13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;box-sizing:border-box}
@@ -17,6 +17,14 @@ export const CSS = `
 .tw .btn{border:1px solid var(--line);background:none;color:var(--accent);cursor:pointer;padding:6px 10px;border-radius:8px;font:inherit}
 .tw .btn:hover{background:var(--hover)}
 .tw .btn:disabled{opacity:.5;cursor:default}
+.tw .btn.pri{background:var(--accent);color:var(--bg)}
+.tw .btn.pri:hover{background:var(--accent);opacity:.9}
+.tw .addform{padding:10px 16px 12px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) minmax(160px,2fr) auto;gap:8px;align-items:end}
+.tw .addform label{display:grid;gap:3px;color:var(--muted);font-size:12px}
+.tw .addform input[type=text],.tw .addform textarea{width:100%;min-width:0;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit}
+.tw .addform textarea{resize:vertical;min-height:34px}
+.tw .addform .row{display:flex;gap:8px}
+@media (max-width:760px){.tw .addform{grid-template-columns:1fr}}
 .tw .kinds{padding:0 16px;display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:8px}
 .tw .kind{border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);cursor:pointer;padding:6px 12px;font:inherit;font-weight:600}
 .tw .kind:hover{color:var(--fg)}
@@ -62,6 +70,17 @@ export const CSS = `
 .tw .item>.acts{grid-column:3;grid-row:1}
 .tw .item.open>.detail:not(:empty){display:block;grid-column:1/-1;grid-row:2;padding:6px 0 4px 22px;border-top:1px dashed var(--line);color:var(--fg)}}
 `;
+
+// Nghĩa theo từ loại từ server dịch (giống cửa sổ dịch): "Tính từ: a, b" mỗi loại một dòng
+const dictText = (dict) =>
+  ((dict && dict.pos) || [])
+    .map((g) => {
+      const words = [...new Set([...g.terms].sort((a, b) => (b.score || 0) - (a.score || 0)).map((t) => t.word))].slice(0, 3);
+      const label = g.pos ? g.pos.charAt(0).toUpperCase() + g.pos.slice(1) : "";
+      return words.length ? label + ": " + words.join(", ") : "";
+    })
+    .filter(Boolean)
+    .join("\n");
 
 const fmtDate = (t) => (t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "");
 const fmtDateCsv = (t) => (t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "");
@@ -201,7 +220,42 @@ const Words = () => {
   const [words, setList] = useState(getWords);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("new");
-  const [kind, setKind] = useState("word"); // "word" | "phrase" | "sentence"
+  const [kind, setKind] = useState("word"); // "word" | "phrase" | "sentence" | "manual" (từ nhập tay)
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ src: "", meaning: "", detail: "" });
+  const [formErr, setFormErr] = useState("");
+  const [autoBusy, setAutoBusy] = useState(false);
+  const reqRef = useRef(0);
+  const timerRef = useRef(null);
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  // Gõ từ xong (dừng 700ms) thì tự gọi API dịch để điền Nghĩa và Chi tiết
+  const autoTranslate = (text) => {
+    clearTimeout(timerRef.current);
+    const t = text.trim();
+    if (!t) {
+      reqRef.current++;
+      setAutoBusy(false);
+      return;
+    }
+    timerRef.current = setTimeout(async () => {
+      const id = ++reqRef.current;
+      setAutoBusy(true);
+      try {
+        const direct = isSingleWordText(t) ? await googleDirect(t, getTarget()) : null;
+        const r = direct || (await apiGet(apiBase, `/translate?target=${encodeURIComponent(getTarget())}&text=${encodeURIComponent(t.slice(0, 5000))}`));
+        if (id !== reqRef.current) return;
+        if (r && r.ok) {
+          setForm((f) => (f.src.trim() === t ? { ...f, meaning: r.text || "", detail: dictText(r.dict) } : f));
+          setFormErr("");
+        } else setFormErr((r && r.error) || "Không dịch được.");
+      } catch (e) {
+        if (id === reqRef.current) setFormErr("Không kết nối được máy chủ dịch (cổng 80).");
+      } finally {
+        if (id === reqRef.current) setAutoBusy(false);
+      }
+    }, 700);
+  };
   const [letter, setLetter] = useState(""); // "" = tất cả
   const [open, setOpen] = useState({});
   const [toast, setToast] = useState(null); // { text, undo }
@@ -227,11 +281,14 @@ const Words = () => {
 
   // Các chữ cái đầu đang có trong danh sách + số từ của mỗi chữ
   const kindCount = useMemo(() => {
-    const c = { word: 0, phrase: 0, sentence: 0 };
-    for (const w of words) c[kindOf(w)]++;
+    const c = { word: 0, phrase: 0, sentence: 0, manual: 0 };
+    for (const w of words) {
+      c[kindOf(w)]++;
+      if (w.manual) c.manual++;
+    }
     return c;
   }, [words]);
-  const inKind = useMemo(() => words.filter((w) => kindOf(w) === kind), [words, kind]);
+  const inKind = useMemo(() => words.filter((w) => (kind === "manual" ? !!w.manual : kindOf(w) === kind)), [words, kind]);
 
   const letters = useMemo(() => {
     const m = new Map();
@@ -255,6 +312,22 @@ const Words = () => {
     else a.sort((x, y) => (y.savedAt || 0) - (x.savedAt || 0));
     return a;
   }, [inKind, q, sort, letter]);
+
+  const addWord = (e) => {
+    e.preventDefault();
+    const src = form.src.trim().slice(0, 500);
+    const meaning = form.meaning.trim();
+    if (!src || !meaning) return setFormErr("Cần nhập cả từ/câu và nghĩa.");
+    const id = wordId(src);
+    if (words.some((x) => x.id === id)) return setFormErr(`"${src.slice(0, 30)}" đã có trong danh sách.`);
+    const w = { id, src, meaning, detail: form.detail.trim(), from: "", to: "", savedAt: Date.now(), manual: true };
+    save([w, ...words]);
+    syncOps(apiBase, [{ action: "add", word: w }]);
+    setForm({ src: "", meaning: "", detail: "" });
+    setFormErr("");
+    setKind("manual");
+    showToast(`Đã thêm "${src.slice(0, 30)}"`);
+  };
 
   const remove = (w) => {
     lastDeleted.current = w;
@@ -348,6 +421,9 @@ const Words = () => {
               <option value="import">Nhập CSV</option>
               <option value="export">Xuất CSV</option>
             </select>
+            <button type="button" className="btn pri" onClick={() => setAdding((v) => !v)}>
+              {adding ? "Ẩn nhập từ" : "+ Nhập từ mới"}
+            </button>
             <a className="btn" href="/translate-settings" target="_blank" rel="noopener noreferrer" title="Cài đặt dịch">
               Cài đặt dịch
             </a>
@@ -364,6 +440,27 @@ const Words = () => {
             />
             {sync.text && <span className={"syncstate" + (sync.err ? " err" : "")}>{sync.text}</span>}
           </div>
+          {adding && (
+            <form className="addform" onSubmit={addWord}>
+              <label>
+                Từ / câu *
+                <input type="text" autoFocus value={form.src} onChange={(e) => { setForm({ ...form, src: e.target.value }); autoTranslate(e.target.value); }} />
+              </label>
+              <label>
+                Nghĩa * {autoBusy && <small>· đang dịch…</small>}
+                <input type="text" value={form.meaning} onChange={(e) => setForm({ ...form, meaning: e.target.value })} />
+              </label>
+              <label>
+                Chi tiết
+                <textarea rows={2} value={form.detail} onChange={(e) => setForm({ ...form, detail: e.target.value })} />
+              </label>
+              <div className="row">
+                <button type="submit" className="btn pri">Thêm</button>
+                <button type="button" className="btn" onClick={() => { setAdding(false); setFormErr(""); clearTimeout(timerRef.current); reqRef.current++; setAutoBusy(false); }}>Đóng</button>
+              </div>
+              {formErr && <span className="err" style={{ gridColumn: "1 / -1" }}>{formErr}</span>}
+            </form>
+          )}
           <div className="kinds">
             <button type="button" className={"kind" + (kind === "word" ? " on" : "")} onClick={() => setKind("word")}>
               Từ <small>{kindCount.word}</small>
@@ -373,6 +470,9 @@ const Words = () => {
             </button>
             <button type="button" className={"kind" + (kind === "sentence" ? " on" : "")} onClick={() => setKind("sentence")}>
               Câu <small>{kindCount.sentence}</small>
+            </button>
+            <button type="button" className={"kind" + (kind === "manual" ? " on" : "")} onClick={() => setKind("manual")} title="Từ bạn nhập tay bằng form, không phải từ lưu từ cửa sổ dịch">
+              Nhập tay <small>{kindCount.manual}</small>
             </button>
           </div>
           {letters.length > 1 && (
@@ -396,7 +496,7 @@ const Words = () => {
           </div>
         </div>
         <div>
-          {!shown.length && <div className="empty">{inKind.length ? "Không có kết quả." : words.length ? (kind === "sentence" ? "Chưa có câu nào." : kind === "phrase" ? "Chưa có cụm từ nào." : "Chưa có từ nào.") : "Chưa có từ nào. Dịch một từ rồi bấm ☆ Lưu trên cửa sổ dịch."}</div>}
+          {!shown.length && <div className="empty">{inKind.length ? "Không có kết quả." : words.length ? (kind === "manual" ? "Chưa có từ nào nhập tay. Bấm + Nhập từ mới." : kind === "sentence" ? "Chưa có câu nào." : kind === "phrase" ? "Chưa có cụm từ nào." : "Chưa có từ nào.") : "Chưa có từ nào. Dịch một từ rồi bấm ☆ Lưu trên cửa sổ dịch."}</div>}
           {shown.map((w) => {
             const lang = /^[a-z]{2,3}(-[A-Za-z]+)?$/.test(w.from || "") ? w.from : "en";
             return (
