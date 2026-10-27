@@ -423,7 +423,7 @@ const toBody = (op) => {
   const w = op.word;
   return {
     action: "add",
-    word: { id: sheetId(w.id), src: escCell(w.src), meaning: escCell(w.meaning), detail: escCell(w.detail), from: w.from, to: w.to, savedAt: w.savedAt }
+    word: { id: sheetId(w.id), src: escCell(w.src), meaning: escCell(w.meaning), detail: escCell(w.detail), from: w.from, to: w.to, savedAt: w.savedAt, manual: !!w.manual }
   };
 };
 
@@ -460,7 +460,9 @@ const fromRow = (r) => {
   const [from = "", to = ""] = String(r.lang || "").split("→");
   let savedAt = r.savedAt;
   if (typeof savedAt !== "number") savedAt = Date.parse(savedAt) || Date.now();
-  return { id: r.id ? localId(r.id) : src.toLowerCase(), src, meaning: unescCell(r.meaning), detail: unescCell(r.detail), from: from.trim(), to: to.trim(), savedAt };
+  // Cột "manual" trên Sheet: TRUE/true/1/x nghĩa là từ nhập tay
+  const manual = r.manual === true || ["true", "1", "x", "yes"].includes(String(r.manual).trim().toLowerCase());
+  return { id: r.id ? localId(r.id) : src.toLowerCase(), src, meaning: unescCell(r.meaning), detail: unescCell(r.detail), from: from.trim(), to: to.trim(), savedAt, manual };
 };
 
 // ---------- Routes ----------
