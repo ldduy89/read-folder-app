@@ -298,69 +298,20 @@ const remember = (key, out) => {
   cache.set(key, out);
 };
 
+// Chỉ dùng Gemini (khi đã cấu hình key) cho cụm / câu; không có Gemini thì dùng kênh web của Google.
+// Từ đơn luôn đi kênh web vì kênh này trả kèm từ điển theo từ loại (Gemini không trả từ điển).
 const doTranslate = async (text, target, key, gemCfg) => {
   if (gemCfg) {
-    const gtxBlockedNow = Date.now() < blockedUntil;
-    const [g, r] = await Promise.all([
-      geminiTranslate(text, target, gemCfg),
-      isShort(text) && !gtxBlockedNow ? gtx(text, target, "&dt=t&dt=bd").catch(() => null) : null
-    ]);
-    if (g) {
-      const out = { ok: true, text: g.text, from: g.from || (r && r.data && r.data[2]) || "auto", to: target, via: "gemini" };
-      if (r && r.data) {
-        try {
-          out.dict = parseDict(r.data);
-        } catch (e) {}
-      }
-      remember(key, out);
-      return out;
-    }
+    const g = await geminiTranslate(text, target, gemCfg);
+    if (!g) return { ok: false, error: "Gemini chưa dịch được (lỗi hoặc đang tạm nghỉ). Thử lại sau ít phút, hoặc kiểm tra key Gemini trong cài đặt." };
+    const out = { ok: true, text: g.text, from: g.from || "auto", to: target, via: "gemini" };
+    remember(key, out);
+    return out;
   }
-
-  // Từ đơn: thử kênh web trước, vì phản hồi của nó đã có từ điển theo từ loại; gtx hay bị Google chặn (429)
-  if (!/\n/.test(text) && isShort(text)) {
-    const first = await webTranslate(text, target, "auto");
-    if (first && first.dict) {
-      const out = { ok: true, text: first.text, from: first.from || "auto", to: target, via: "web", dict: first.dict };
-      remember(key, out);
-      return out;
-    }
-  }
-
-  if (Date.now() < blockedUntil) {
-    const web = /\n/.test(text) ? null : await webTranslate(text, target, "auto");
-    if (web) return { ok: true, text: web.text, from: web.from || "auto", to: target, via: "web", ...(web.dict ? { dict: web.dict } : {}) };
-    const sec = Math.ceil((blockedUntil - Date.now()) / 1000);
-    return { ok: false, blocked: true, error: `Google đang từ chối yêu cầu từ máy chủ, thử lại sau khoảng ${sec} giây.` };
-  }
-  let r = null;
-  if (isShort(text)) r = await gtx(text, target, "&dt=t&dt=bd");
-  const dictOk = !!(r && r.data);
-  if (!dictOk && !(r && r.blocked)) r = await gtx(text, target, "&dt=t");
-  if (!r.data) {
-    if (r.blocked) blockedUntil = Date.now() + COOLDOWN_MS;
-    // Kênh gtx hỏng: thử kênh web của Google (không có nghĩa theo từ loại) trước khi báo lỗi
-    const web = /\n/.test(text) ? null : await webTranslate(text, target, "auto");
-    if (web) {
-      const out = { ok: true, text: web.text, from: web.from || "auto", to: target, via: "web", ...(web.dict ? { dict: web.dict } : {}) };
-      remember(key, out);
-      return out;
-    }
-    if (r.blocked) return { ok: false, blocked: true, error: `Google từ chối yêu cầu từ máy chủ (HTTP ${r.status}), thử lại sau khoảng 1 phút. Chi tiết xem trong cửa sổ console của server.` };
-    return { ok: false, error: `Google Translate trả về lỗi (HTTP ${r.status}). Chi tiết xem trong cửa sổ console của server.` };
-  }
-  blockedUntil = 0;
-  const data = r.data;
-  const gtxText = (data[0] || []).map((p) => p[0]).join("");
-  // Bản dịch chính lấy từ kênh web (giống app); văn bản nhiều dòng giữ gtx để không mất xuống dòng
-  const web = /\n/.test(text) ? null : await webTranslate(text, target, data[2]);
-  const out = { ok: true, text: (web && web.text) || gtxText, from: data[2] || (web && web.from) || "auto", to: target, via: web ? "web" : "gtx" };
-  if (dictOk) {
-    try {
-      out.dict = parseDict(data);
-    } catch (e) {}
-  }
-  if ((!out.dict || !out.dict.pos.length) && web && web.dict) out.dict = web.dict; // gtx không có từ điển -> lấy từ kênh web
+  if (/\n/.test(text)) return { ok: false, error: "Văn bản nhiều dòng cần cấu hình Gemini (kênh web của Google không giữ xuống dòng)." };
+  const web = await webTranslate(text, target, "auto");
+  if (!web) return { ok: false, error: "Kênh web của Google không phản hồi (có thể đang bị chặn), thử lại sau ít phút." };
+  const out = { ok: true, text: web.text, from: web.from || "auto", to: target, via: "web", ...(web.dict ? { dict: web.dict } : {}) };
   remember(key, out);
   return out;
 };
