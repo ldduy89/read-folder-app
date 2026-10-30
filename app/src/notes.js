@@ -61,8 +61,7 @@ const fmtDate = (ts) => (ts ? new Date(ts).toLocaleDateString("vi-VN") : "");
 const createdOf = (n) => n.createdAt || n.updatedAt;
 
 const CSS = `
-.nt{--bg:#fff;--fg:#202124;--muted:#5f6368;--line:#e3e5e8;--hover:#f3f7fd;--sel:#e8f0fe;--accent:#1a73e8;--title:#0000ff;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-sizing:border-box}
-@media (prefers-color-scheme: dark){.nt{--bg:#202124;--fg:#e8eaed;--muted:#9aa0a6;--line:#3c4043;--hover:#2a2d31;--sel:#303a4d;--accent:#8ab4f8;--title:#8ab4f8}}
+.nt{--bg:#282c34;--fg:#e6e6e6;--muted:#9aa0a6;--line:#3e4451;--hover:#333a45;--sel:#3a4150;--accent:#61afef;--title:#61afef;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-sizing:border-box}
 .nt *{box-sizing:border-box}
 .nt .top{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .nt h1{font-size:16px;margin:0 8px}
@@ -73,7 +72,8 @@ const CSS = `
 .nt .btn.pri{background:var(--accent);color:var(--bg)}
 .nt .btn.danger{color:#d93025}
 .nt .btn.sm{padding:2px 8px;font-size:12px}
-.nt .body{display:flex;flex:1;min-height:0;width:100%;max-width:1200px;margin:0 auto}
+.nt .body{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;max-width:1200px;margin:0 auto}
+.nt .split{display:flex;flex:1;min-height:0}
 .nt .list{width:300px;flex-shrink:0;border-right:1px solid var(--line);overflow-y:auto}
 .nt .item{padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
 .nt .item:hover{background:var(--hover)}
@@ -110,7 +110,7 @@ const CSS = `
 .nt textarea{min-height:200px;resize:vertical}
 .nt .modal .actions{display:flex;justify-content:flex-end;gap:8px}
 @media (max-width:700px){
-  .nt .body{flex-direction:column}
+  .nt .split{flex-direction:column}
   .nt .list{width:auto;max-height:40vh;border-right:0;border-bottom:1px solid var(--line)}
   .nt .stack{padding:8px 14px 40px}
 }
@@ -436,22 +436,22 @@ const Notes = () => {
     <div className={"nt" + (player ? " has-player" : "")}>
       <style>{CSS}</style>
 
-      <div className="top">
-        <Link className="btn" to="/">← Trang chủ</Link>
-        <h1>Ghi chú</h1>
-        <span className="sp" />
-        <button type="button" className="btn" onClick={() => changeView(view === "split" ? "stack" : "split")}>
-          {view === "split" ? "Xem liền nhau" : "Xem danh sách"}
-        </button>
-        <button type="button" className="btn pri" onClick={() => setModal({ title: "", content: "", err: "" })}>
-          + Thêm
-        </button>
-        <button type="button" className="btn" onClick={syncAll} disabled={sync.busy}>
-          Đồng bộ Sheet
-        </button>
-        {sync.text && <span className={"status" + (sync.err ? " err" : "")}>{sync.text}</span>}
-      </div>
-
+      <div className="body">
+        <div className="top">
+          <Link className="btn" to="/">← Trang chủ</Link>
+          <h1>Ghi chú</h1>
+          <span className="sp" />
+          <button type="button" className="btn" onClick={() => changeView(view === "split" ? "stack" : "split")}>
+            {view === "split" ? "Xem liền nhau" : "Xem danh sách"}
+          </button>
+          <button type="button" className="btn pri" onClick={() => setModal({ title: "", content: "", err: "" })}>
+            + Thêm
+          </button>
+          <button type="button" className="btn" onClick={syncAll} disabled={sync.busy}>
+            Đồng bộ Sheet
+          </button>
+          {sync.text && <span className={"status" + (sync.err ? " err" : "")}>{sync.text}</span>}
+        </div>
       {view === "stack" ? (
         <div className="stack">
           {notes.length === 0 && <div className="empty">Chưa có ghi chú. Bấm “+ Thêm” để tạo.</div>}
@@ -511,7 +511,7 @@ const Notes = () => {
           ))}
         </div>
       ) : (
-        <div className="body">
+        <div className="split">
           <div className="list">
             {notes.length === 0 && <div className="empty">Chưa có ghi chú. Bấm “+ Thêm” để tạo.</div>}
             {notes.map((n) => (
@@ -544,6 +544,7 @@ const Notes = () => {
           </div>
         </div>
       )}
+      </div>
 
       {player && (
         <div className="player">

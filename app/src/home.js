@@ -599,7 +599,6 @@ const Home = (props) => {
     stopExternalAudio();
     setAudioList([]);
     // Vào video: tua tới vị trí đã lưu (nếu có). Đặt sau stopExternalAudio() vì hàm đó xoá resumeAtRef
-    setBrowserFull(false);
     resumeReadyRef.current = false;
     resumeAtRef.current = type === "file" ? getResume(pathViewFile) : null;
     if (type !== "file") {

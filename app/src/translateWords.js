@@ -3,8 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiBaseOf, apiGet, copyText, createSpeaker, getTarget, getWords, googleDirect, isSingleWordText, setWords, syncNow, syncOps, wordId } from "./translateLib";
 
 export const CSS = `
-.tw{--bg:#fff;--fg:#202124;--muted:#5f6368;--line:#e3e5e8;--hover:#f3f7fd;--head:#f8f9fa;--accent:#1a73e8;min-height:100vh;background:var(--bg);color:var(--fg);font:13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;box-sizing:border-box}
-@media (prefers-color-scheme: dark){.tw{--bg:#202124;--fg:#e8eaed;--muted:#9aa0a6;--line:#3c4043;--hover:#2a2d31;--head:#292b2f;--accent:#8ab4f8}}
+.tw{--bg:#282c34;--fg:#e6e6e6;--muted:#9aa0a6;--line:#3e4451;--hover:#333a45;--head:#2e333d;--accent:#61afef;min-height:100vh;background:var(--bg);color:var(--fg);font:13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;box-sizing:border-box}
 .tw *{box-sizing:border-box}
 .tw .wrap{max-width:1100px;margin:0 auto}
 .tw .sticky{position:sticky;top:0;z-index:2;background:var(--bg)}
@@ -83,116 +82,8 @@ const dictText = (dict) =>
     .join("\n");
 
 const fmtDate = (t) => (t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "");
-const fmtDateCsv = (t) => (t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "");
 
-// ---------- Nhập / xuất CSV ----------
 const norm = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase().trim();
-const HEADER_ALIASES = {
-  src: ["tu", "word", "src", "front", "term", "source"],
-  meaning: ["nghia", "meaning", "translation", "back", "dich"],
-  detail: ["chi tiet", "detail", "details", "note", "notes"],
-  lang: ["ngon ngu", "language", "lang"],
-  date: ["ngay luu", "ngay", "date", "saved", "savedat"]
-};
-
-// Đọc CSV: hỗ trợ dấu ngoặc kép, dấu phẩy / chấm phẩy / tab, xuống dòng trong ô, BOM
-const parseCsv = (text) => {
-  text = text.replace(/^\ufeff/, "");
-  const firstLine = (text.split(/\r?\n/, 1)[0] || "").replace(/"[^"]*"/g, "");
-  const count = (ch) => firstLine.split(ch).length - 1;
-  const delim = [",", ";", "\t"].sort((a, b) => count(b) - count(a))[0];
-  const rows = [];
-  let row = [];
-  let cell = "";
-  let inQ = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQ) {
-      if (c === '"') {
-        if (text[i + 1] === '"') {
-          cell += '"';
-          i++;
-        } else inQ = false;
-      } else cell += c;
-    } else if (c === '"') inQ = true;
-    else if (c === delim) {
-      row.push(cell);
-      cell = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(cell);
-      cell = "";
-      rows.push(row);
-      row = [];
-    } else cell += c;
-  }
-  if (cell !== "" || row.length) {
-    row.push(cell);
-    rows.push(row);
-  }
-  return rows.filter((r) => r.some((x) => x.trim() !== ""));
-};
-
-const parseDate = (s) => {
-  s = String(s || "").trim();
-  if (!s) return null;
-  if (/^\d{10,13}$/.test(s)) return s.length === 10 ? Number(s) * 1000 : Number(s);
-  const m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/); // ngày/tháng/năm (kiểu Việt Nam)
-  if (m) {
-    const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
-    const t = new Date(y, Number(m[2]) - 1, Number(m[1])).getTime();
-    return Number.isNaN(t) ? null : t;
-  }
-  const t = Date.parse(s);
-  return Number.isNaN(t) ? null : t;
-};
-
-const csvToWords = (rows) => {
-  if (!rows.length) return [];
-  const header = rows[0].map(norm);
-  const col = {};
-  for (const [key, names] of Object.entries(HEADER_ALIASES)) {
-    const i = header.findIndex((h) => names.includes(h));
-    if (i >= 0) col[key] = i;
-  }
-  let data;
-  if (col.src != null) data = rows.slice(1);
-  else {
-    data = rows;
-    Object.assign(col, { src: 0, meaning: 1, detail: 2, lang: 3, date: 4 }); // không có tiêu đề: theo thứ tự cột
-  }
-  const get = (r, k) => (col[k] != null && r[col[k]] != null ? r[col[k]].trim() : "");
-  const seen = new Set();
-  const now = Date.now();
-  const out = [];
-  data.forEach((r, i) => {
-    const src = get(r, "src");
-    if (!src) return;
-    const id = src.toLowerCase();
-    if (seen.has(id)) return;
-    seen.add(id);
-    const [from = "", to = ""] = get(r, "lang").split(/→|->/).map((x) => x.trim());
-    out.push({
-      id,
-      src: src.slice(0, 500),
-      meaning: get(r, "meaning"),
-      detail: get(r, "detail").replace(/ \| /g, "\n"), // khi xuất CSV, xuống dòng được đổi thành " | "
-      from,
-      to,
-      savedAt: parseDate(get(r, "date")) || now - i
-    });
-  });
-  return out;
-};
-
-const readCsvFile = async (file) => {
-  const buf = await file.arrayBuffer();
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
-  } catch (e) {
-    return new TextDecoder("windows-1258").decode(buf).normalize("NFC"); // Excel tiếng Việt đôi khi lưu CSV không phải UTF-8
-  }
-};
 
 // Chữ cái đầu của từ (bỏ dấu, viết hoa); ký tự không phải chữ/số gom vào "#"
 const firstLetter = (w) => {
@@ -214,7 +105,6 @@ const Words = () => {
   const apiBase = useMemo(apiBaseOf, []);
   const speaker = useMemo(() => createSpeaker(apiBase), [apiBase]);
   const rootRef = useRef(null);
-  const fileRef = useRef(null);
   const toastTimer = useRef(null);
   const lastDeleted = useRef(null);
   const [words, setList] = useState(getWords);
@@ -344,46 +234,6 @@ const Words = () => {
     setToast(null);
   };
 
-  const exportCsv = () => {
-    const esc = (s) => `"${String(s == null ? "" : s).replace(/"/g, '""').replace(/\n/g, " | ")}"`;
-    const rows = [["Từ", "Nghĩa", "Chi tiết", "Ngôn ngữ", "Ngày lưu"], ...shown.map((w) => [w.src, w.meaning, w.detail, `${w.from || ""}→${w.to || ""}`, fmtDateCsv(w.savedAt)])];
-    const csv = "\ufeff" + rows.map((r) => r.map(esc).join(",")).join("\r\n"); // BOM để Excel đọc đúng tiếng Việt
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    a.download = "tu-da-luu.csv";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  };
-
-  const importFile = async (file) => {
-    let imported;
-    try {
-      imported = csvToWords(parseCsv(await readCsvFile(file)));
-    } catch (e) {
-      return showToast("Không đọc được file: " + e.message);
-    }
-    if (!imported.length) return showToast("Không tìm thấy từ nào trong file. Cột đầu tiên cần là từ, cột thứ hai là nghĩa.");
-    const byId = new Map(words.map((x) => [x.id, x]));
-    const dups = imported.filter((x) => byId.has(x.id)).length;
-    const overwrite = dups > 0 && window.confirm(`${dups} từ trong file đã có trong danh sách.\n\nOK = ghi đè nghĩa bằng dữ liệu trong file\nHủy = giữ nguyên, bỏ qua các từ trùng`);
-    const added = [];
-    const updated = [];
-    for (const x of imported) {
-      const old = byId.get(x.id);
-      if (!old) added.push(x);
-      else if (overwrite) {
-        const merged = { ...old, meaning: x.meaning || old.meaning, detail: x.detail || old.detail, from: x.from || old.from, to: x.to || old.to };
-        byId.set(x.id, merged);
-        updated.push(merged);
-      }
-    }
-    save([...added, ...words.map((x) => byId.get(x.id) || x)]);
-    const ops = [...added, ...updated].map((x) => ({ action: "add", word: x }));
-    if (ops.length) syncOps(apiBase, ops);
-    const skipped = dups - updated.length;
-    showToast(`Đã nhập ${added.length} từ mới` + (updated.length ? `, cập nhật ${updated.length}` : "") + (skipped > 0 ? `, bỏ qua ${skipped} từ trùng` : ""));
-  };
-
   const doSync = async () => {
     setSync({ busy: true, text: "Đang đồng bộ…", err: false });
     const r = await syncNow(apiBase);
@@ -403,41 +253,15 @@ const Words = () => {
               <option value="old">Cũ nhất</option>
               <option value="az">A → Z</option>
             </select>
-            <select
-              className="menu"
-              title="Thêm"
-              value=""
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "sync") doSync();
-                else if (v === "import") fileRef.current && fileRef.current.click();
-                else if (v === "export") exportCsv();
-              }}
-            >
-              <option value="">⋯</option>
-              <option value="sync" disabled={sync.busy}>
-                Đồng bộ
-              </option>
-              <option value="import">Nhập CSV</option>
-              <option value="export">Xuất CSV</option>
-            </select>
+            <button type="button" className="btn" onClick={doSync} disabled={sync.busy}>
+              Đồng bộ
+            </button>
             <button type="button" className="btn pri" onClick={() => setAdding((v) => !v)}>
               {adding ? "Ẩn nhập từ" : "+ Nhập từ mới"}
             </button>
             <a className="btn" href="/translate-settings" target="_blank" rel="noopener noreferrer" title="Cài đặt dịch">
               Cài đặt dịch
             </a>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,.txt,text/csv"
-              hidden
-              onChange={async (e) => {
-                const f = e.target.files && e.target.files[0];
-                e.target.value = ""; // cho phép chọn lại cùng một file
-                if (f) await importFile(f);
-              }}
-            />
             {sync.text && <span className={"syncstate" + (sync.err ? " err" : "")}>{sync.text}</span>}
           </div>
           {adding && (
