@@ -563,7 +563,7 @@ module.exports = (app) => {
   app.post("/notes-upsert", guard, json, safe(async (req) => {
     const n = req.body && req.body.note;
     if (!n || typeof n.id !== "string" || !n.id || typeof n.title !== "string") return { ok: false, error: "Ghi chú không hợp lệ." };
-    clearTts(n.id); // ghi chú vừa sửa: audio cũ không còn đúng
+    pruneTts(n.id, n.content); // sửa: chỉ xoá audio của đoạn không còn trong nội dung
     await syncCall(noteCfg(), { action: "note-upsert", note: noteRow(n) });
     return { ok: true };
   }));
@@ -699,6 +699,79 @@ module.exports = (app) => {
   const ttsBase = (id, index, text) => {
     const hash = crypto.createHash("sha1").update(text).digest("hex").slice(0, 10);
     return path.join(TTS_DIR, `${id}-${index}-${hash}-v3`);
+  };
+
+  const chunkTextSrv = (text, max = 180) => {
+    const pieces = text.match(/[^.!?。！？\n]+[.!?。！？]?/g) || [text];
+    const chunks = [];
+    let cur = "";
+    const push = (s) => {
+      if (s.trim()) chunks.push(s.trim());
+    };
+    for (let p of pieces) {
+      while (p.length > max) {
+        let cut = p.lastIndexOf(" ", max);
+        if (cut < max / 2) cut = max;
+        if ((cur + p.slice(0, cut)).length > max) {
+          push(cur);
+          cur = "";
+        }
+        push(cur + p.slice(0, cut));
+        cur = "";
+        p = p.slice(cut);
+      }
+      if ((cur + p).length > max) {
+        push(cur);
+        cur = p;
+      } else cur += p;
+    }
+    push(cur);
+    return chunks;
+  };
+
+  const splitSentencesSrv = (line) => {
+    const out = [];
+    const re = /[.!?…]+(?=\s|$)/g;
+    let start = 0;
+    let m;
+    while ((m = re.exec(line))) {
+      const end = m.index + m[0].length;
+      out.push(line.slice(start, end));
+      start = end;
+    }
+    if (start < line.length) out.push(line.slice(start));
+    return out.filter((p) => p.trim());
+  };
+
+  // Các hash hợp lệ của nội dung: đoạn đọc cả ghi chú và từng câu (cùng cách tách với client)
+  const validTtsHashes = (content) => {
+    const h = (t) => crypto.createHash("sha1").update(t).digest("hex").slice(0, 10);
+    const text = String(content || "");
+    const keep = new Set();
+    for (const c of chunkTextSrv(text.trim(), 3000)) keep.add(h(c.slice(0, 4000)));
+    for (const line of text.split("\n")) {
+      for (const part of splitSentencesSrv(line)) {
+        const core = part.trim();
+        if (core) keep.add(h(core.slice(0, 4000)));
+      }
+    }
+    return keep;
+  };
+
+  // Sửa ghi chú: chỉ xoá file audio của đoạn không còn trong nội dung mới, giữ lại phần còn dùng được
+  const pruneTts = (id, content) => {
+    const sid = safeNoteId(id);
+    if (!sid || !fs.existsSync(TTS_DIR)) return;
+    const keep = validTtsHashes(content);
+    for (const f of fs.readdirSync(TTS_DIR)) {
+      if (!f.startsWith(sid + "-")) continue;
+      const hash = f.slice(sid.length + 1).split("-")[1]; // <số đoạn>-<hash>-v3.<ext>
+      if (!keep.has(hash)) {
+        try {
+          fs.unlinkSync(path.join(TTS_DIR, f));
+        } catch (e) {}
+      }
+    }
   };
 
   // Xoá mọi file audio của một ghi chú
