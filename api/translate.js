@@ -584,12 +584,56 @@ module.exports = (app) => {
   // ---- Đọc ghi chú bằng Gemini TTS, cache file WAV theo từng đoạn ----
   // File nằm trong api/tts-cache/<noteId>-<đoạn>-<hash nội dung>.wav
   // Sửa hoặc xoá ghi chú thì xoá toàn bộ file audio của ghi chú đó.
-  const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
+  const GEMINI_TTS_MODEL = "gemini-3.8-flash-tts";
   const GEMINI_TTS_VOICE = "Kore";
   const TTS_DIR = path.join(__dirname, "tts-cache");
   const crypto = require("crypto");
 
+  // Cắt đuôi nhiễu: chỉ cắt khi 30ms+ cuối đoạn là "bùng lên" (biên độ lớn và đổi dấu liên tục).
+  // Đuôi giọng nói bình thường suy giảm dần nên không bị cắt. Trả về mảng mẫu đã cắt.
+  const trimNoisyTail = (samples, rate) => {
+    const w = Math.floor(rate / 100); // cửa sổ 10ms
+    const nw = Math.floor(samples.length / w);
+    if (nw === 0) return samples;
+    const rms = new Array(nw);
+    const noisy = new Array(nw);
+    for (let j = 0; j < nw; j++) {
+      let e = 0;
+      let z = 0;
+      for (let k = j * w; k < j * w + w; k++) {
+        e += samples[k] * samples[k];
+        if (k > j * w && samples[k - 1] < 0 !== samples[k] < 0) z++;
+      }
+      rms[j] = Math.sqrt(e / w);
+      noisy[j] = rms[j] > 3000 && z / w > 0.15;
+    }
+    if (!noisy[nw - 1]) return samples;
+    let j = nw - 1;
+    while (j > 0 && noisy[j - 1]) j--;
+    // Lùi thêm qua phần đầu của tiếng bùng (còn biên độ lớn) để cắt sạch
+    while (j > 0 && rms[j - 1] > 300) j--;
+    if ((nw - j) * w < Math.floor(rate * 0.03)) return samples; // đuôi quá ngắn: giữ nguyên
+    return samples.slice(0, j * w);
+  };
+
   const wavFromPcm = (pcm, rate) => {
+    // Bỏ byte lẻ (mẫu 16-bit phải đủ 2 byte)
+    const n0 = (pcm.length - (pcm.length % 2)) / 2;
+    let samples = new Int16Array(n0);
+    for (let k = 0; k < n0; k++) samples[k] = pcm.readInt16LE(k * 2);
+    // Cắt đoạn nhiễu ở cuối (nếu có), rồi làm mờ đầu và cuối để không có tiếng "click" / gãy
+    samples = trimNoisyTail(samples, rate);
+    const n = samples.length;
+    const fadeIn = Math.min(Math.floor(rate * 0.01), n); // 10 ms
+    const fadeOut = Math.min(Math.floor(rate * 0.06), n); // 60 ms
+    for (let k = 0; k < n; k++) {
+      let v = samples[k];
+      if (fadeIn > 0 && k < fadeIn) v = Math.round((v * k) / fadeIn);
+      if (fadeOut > 0 && k >= n - fadeOut) v = Math.round((v * (n - 1 - k)) / fadeOut);
+      samples[k] = Math.max(-32768, Math.min(32767, v));
+    }
+    pcm = Buffer.alloc(n * 2);
+    for (let k = 0; k < n; k++) pcm.writeInt16LE(samples[k], k * 2);
     const h = Buffer.alloc(44);
     h.write("RIFF", 0);
     h.writeUInt32LE(36 + pcm.length, 4);
@@ -629,6 +673,11 @@ module.exports = (app) => {
     } catch (e) {}
     if (!r.ok) {
       const msg = (data && data.error && data.error.message) || r.text.slice(0, 200);
+      if (r.status === 429) {
+        // Gói miễn phí của model TTS giới hạn số yêu cầu mỗi ngày
+        const wait = (/retry in (.+?)\./.exec(msg) || [])[1] || "vài giờ";
+        throw new Error(`Gemini TTS đã hết hạn mức (gói miễn phí chỉ có 10 yêu cầu/ngày cho model này). Thử lại sau ${wait}, hoặc bật billing trong Google AI Studio.`);
+      }
       throw new Error(`Gemini TTS lỗi HTTP ${r.status}: ${msg}`);
     }
     const parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
@@ -642,7 +691,7 @@ module.exports = (app) => {
   const safeNoteId = (id) => String(id || "").replace(/[^A-Za-z0-9]/g, "");
   const ttsFile = (id, index, text) => {
     const hash = crypto.createHash("sha1").update(text).digest("hex").slice(0, 10);
-    return path.join(TTS_DIR, `${id}-${index}-${hash}.wav`);
+    return path.join(TTS_DIR, `${id}-${index}-${hash}-v3.wav`);
   };
 
   // Xoá mọi file audio của một ghi chú

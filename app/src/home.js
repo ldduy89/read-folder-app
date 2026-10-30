@@ -2145,6 +2145,17 @@ const Home = (props) => {
                   </a>
                   <a
                     className="inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full"
+                    href="/notes"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Ghi chú"
+                    aria-label="Ghi chú"
+                  >
+                    <span aria-hidden="true">✎</span>
+                    <span className="compact:hidden">Ghi chú</span>
+                  </a>
+                  <a
+                    className="inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full"
                     href="/translate-settings"
                     target="_blank"
                     rel="noopener noreferrer"

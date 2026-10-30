@@ -12,6 +12,7 @@ import Home from "./home";
 import Read from "./read";
 import TranslateWords from "./translateWords";
 import TranslateSettings from "./translateSettings";
+import Notes from "./notes";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route exact path="/read/*" component={Read} />
           <Route exact path="/translate-words" component={TranslateWords} />
           <Route exact path="/translate-settings" component={TranslateSettings} />
+          <Route exact path="/notes" component={Notes} />
           <Route exact path="/*" component={Home} />
 
           
