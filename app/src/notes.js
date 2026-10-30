@@ -38,7 +38,20 @@ const saveView = (v) => {
 const sortNotes = (list) => [...list].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 // Tách dòng thành các câu, mỗi câu kết thúc bằng . ! ? … (giữ khoảng trắng đầu câu)
-const splitSentences = (line) => (line.match(/[^.!?…]*[.!?…]+|[^.!?…]+$/g) || []).filter((p) => p.trim());
+// Chỉ tách khi dấu kết thúc câu đứng sau nó là khoảng trắng hoặc cuối dòng (không tách React.js, Node.js, v1.2...)
+const splitSentences = (line) => {
+  const out = [];
+  const re = /[.!?…]+(?=\s|$)/g;
+  let start = 0;
+  let m;
+  while ((m = re.exec(line))) {
+    const end = m.index + m[0].length;
+    out.push(line.slice(start, end));
+    start = end;
+  }
+  if (start < line.length) out.push(line.slice(start));
+  return out.filter((p) => p.trim());
+};
 const fmtClock = (sec) => {
   const t = Math.floor(sec || 0);
   return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
@@ -181,33 +194,43 @@ const Notes = () => {
     return res.arrayBuffer();
   };
 
-  // Ghép nhiều WAV cùng định dạng (PCM 16-bit mono, header 44 byte) thành một WAV
-  const mergeWavs = (bufs) => {
-    const rate = new DataView(bufs[0]).getUint32(24, true);
-    const pcms = bufs.map((b) => new Uint8Array(b, 44));
-    const total = pcms.reduce((n, p) => n + p.length, 0);
-    const out = new Uint8Array(44 + total);
-    const dv = new DataView(out.buffer);
-    const str = (off, t) => [...t].forEach((c, k) => (out[off + k] = c.charCodeAt(0)));
-    str(0, "RIFF");
-    dv.setUint32(4, 36 + total, true);
-    str(8, "WAVE");
-    str(12, "fmt ");
-    dv.setUint32(16, 16, true);
-    dv.setUint16(20, 1, true);
-    dv.setUint16(22, 1, true);
-    dv.setUint32(24, rate, true);
-    dv.setUint32(28, rate * 2, true);
-    dv.setUint16(32, 2, true);
-    dv.setUint16(34, 16, true);
-    str(36, "data");
-    dv.setUint32(40, total, true);
-    let off = 44;
-    pcms.forEach((p) => {
-      out.set(p, off);
-      off += p.length;
-    });
-    return new Blob([out], { type: "audio/wav" });
+  // Giải mã từng đoạn (WAV từ Gemini hoặc MP3 từ Google Translate) rồi ghép thành một WAV 24kHz 16-bit mono
+  const toPcmWav = async (bufs) => {
+    const RATE = 24000;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx({ sampleRate: RATE });
+    try {
+      const decoded = [];
+      for (const b of bufs) decoded.push(await ctx.decodeAudioData(b.slice(0)));
+      const total = decoded.reduce((n, d) => n + d.length, 0);
+      const out = new ArrayBuffer(44 + total * 2);
+      const dv = new DataView(out);
+      const str = (off, t) => [...t].forEach((c, k) => dv.setUint8(off + k, c.charCodeAt(0)));
+      str(0, "RIFF");
+      dv.setUint32(4, 36 + total * 2, true);
+      str(8, "WAVE");
+      str(12, "fmt ");
+      dv.setUint32(16, 16, true);
+      dv.setUint16(20, 1, true);
+      dv.setUint16(22, 1, true);
+      dv.setUint32(24, RATE, true);
+      dv.setUint32(28, RATE * 2, true);
+      dv.setUint16(32, 2, true);
+      dv.setUint16(34, 16, true);
+      str(36, "data");
+      dv.setUint32(40, total * 2, true);
+      let off = 44;
+      for (const d of decoded) {
+        const ch = d.getChannelData(0);
+        for (let k = 0; k < ch.length; k++, off += 2) {
+          const v = Math.max(-1, Math.min(1, ch[k]));
+          dv.setInt16(off, Math.round(v < 0 ? v * 0x8000 : v * 0x7fff), true);
+        }
+      }
+      return new Blob([out], { type: "audio/wav" });
+    } finally {
+      ctx.close();
+    }
   };
 
   // Đọc một dãy đoạn văn bản thành một file có thanh tua
@@ -222,7 +245,7 @@ const Notes = () => {
         bufs.push(await fetchChunk(noteId, k, texts[k]));
         if (mine !== ttsRef.current.id) return; // đã bấm dừng
       }
-      const url = URL.createObjectURL(mergeWavs(bufs));
+      const url = URL.createObjectURL(await toPcmWav(bufs));
       const audio = new Audio(url);
       ttsRef.current.audio = audio;
       ttsRef.current.url = url;
@@ -243,8 +266,8 @@ const Notes = () => {
     }
   };
 
-  // Đọc toàn bộ nội dung ghi chú (từng đoạn theo dòng, tách nhỏ dưới 800 ký tự)
-  const speakNote = (note) => speakTexts(note.id, chunkText((note.content || "").trim(), 800));
+  // Đọc toàn bộ nội dung ghi chú (tách thành đoạn dưới 3000 ký tự để tiết kiệm yêu cầu)
+  const speakNote = (note) => speakTexts(note.id, chunkText((note.content || "").trim(), 3000)); // đoạn lớn để ít yêu cầu Gemini
 
   const togglePlay = () => {
     const a = ttsRef.current.audio;

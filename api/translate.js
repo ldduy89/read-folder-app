@@ -584,7 +584,14 @@ module.exports = (app) => {
   // ---- Đọc ghi chú bằng Gemini TTS, cache file WAV theo từng đoạn ----
   // File nằm trong api/tts-cache/<noteId>-<đoạn>-<hash nội dung>.wav
   // Sửa hoặc xoá ghi chú thì xoá toàn bộ file audio của ghi chú đó.
-  const GEMINI_TTS_MODEL = "gemini-3.8-flash-tts";
+  // Thử lần lượt; model nào lỗi (kể cả hết hạn mức) thì chuyển sang model kế tiếp
+  const GEMINI_TTS_MODELS = [
+    "gemini-2.5-flash-preview-tts",
+    "gemini-2.5-pro-preview-tts",
+    "gemini-3.1-flash-tts-preview",
+    "gemini-3.8-flash-lite-tts",
+    "gemini-3.8-flash-tts",
+  ];
   const GEMINI_TTS_VOICE = "Kore";
   const TTS_DIR = path.join(__dirname, "tts-cache");
   const crypto = require("crypto");
@@ -652,10 +659,10 @@ module.exports = (app) => {
   };
 
   // Gọi Gemini, trả về WAV; lỗi thì throw Error có thông báo tiếng Việt
-  const geminiWav = async (text) => {
+  const geminiWav = async (text, model) => {
     const cfg = getConfig();
     if (!cfg.geminiKey) throw new Error("Chưa có Gemini API key (vào Cài đặt dịch để nhập).");
-    const r = await httpFetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent`, {
+    const r = await httpFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.geminiKey },
       timeout: 60000,
@@ -689,9 +696,9 @@ module.exports = (app) => {
 
   // Chỉ cho phép id chữ-số để tên file an toàn
   const safeNoteId = (id) => String(id || "").replace(/[^A-Za-z0-9]/g, "");
-  const ttsFile = (id, index, text) => {
+  const ttsBase = (id, index, text) => {
     const hash = crypto.createHash("sha1").update(text).digest("hex").slice(0, 10);
-    return path.join(TTS_DIR, `${id}-${index}-${hash}-v3.wav`);
+    return path.join(TTS_DIR, `${id}-${index}-${hash}-v3`);
   };
 
   // Xoá mọi file audio của một ghi chú
@@ -707,19 +714,79 @@ module.exports = (app) => {
     }
   };
 
+  // Google Translate TTS (dự phòng): route này chỉ nhận đoạn ngắn, nên tách văn bản thành các đoạn <= 180 ký tự
+  const splitForGoogle = (text, max) => {
+    const out = [];
+    let cur = "";
+    for (const w of text.split(/\s+/).filter(Boolean)) {
+      const next = cur ? cur + " " + w : w;
+      if (next.length > max && cur) {
+        out.push(cur);
+        cur = w;
+      } else cur = next;
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const googleSeg = (text, lang) =>
+    new Promise((resolve, reject) => {
+      const p = `/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(text)}`;
+      const req = https.get({ hostname: "translate.google.com", path: p, headers: { "User-Agent": UA } }, (up) => {
+        if (up.statusCode !== 200) {
+          up.resume();
+          return reject(new Error("Google TTS HTTP " + up.statusCode));
+        }
+        const parts = [];
+        up.on("data", (c) => parts.push(c));
+        up.on("end", () => resolve(Buffer.concat(parts)));
+        up.on("error", reject);
+      });
+      req.setTimeout(15000, () => req.destroy(new Error("Google TTS hết thời gian chờ")));
+      req.on("error", reject);
+    });
+  const googleMp3 = async (text, lang) => {
+    const parts = [];
+    for (const seg of splitForGoogle(text, 180)) parts.push(await googleSeg(seg, lang));
+    return Buffer.concat(parts);
+  };
+
+  // Gemini (lần lượt các model) -> Google Translate nếu tất cả đều lỗi
+  const synthesize = async (text, lang) => {
+    let lastErr = null;
+    for (const model of GEMINI_TTS_MODELS) {
+      try {
+        return { buf: await geminiWav(text, model), ext: "wav" };
+      } catch (e) {
+        lastErr = e;
+        console.warn(`[tts] ${model}: ${e.message}`);
+      }
+    }
+    try {
+      return { buf: await googleMp3(text, lang), ext: "mp3" };
+    } catch (e) {
+      throw new Error(`Gemini không đọc được (${lastErr ? lastErr.message : "?"}); Google Translate cũng lỗi: ${e.message}`);
+    }
+  };
+
   app.post("/notes-tts", guard, json, async (req, res) => {
     const fail = (error) => res.json({ ok: false, error });
     try {
       const id = safeNoteId(req.body && req.body.id);
       const index = Math.max(0, Math.floor(Number(req.body && req.body.index)) || 0);
       const text = String((req.body && req.body.text) || "").trim().slice(0, 4000);
+      const lang = String((req.body && req.body.lang) || "en").replace(/[^a-zA-Z-]/g, "") || "en";
       if (!id || !text) return fail("Không có nội dung để đọc.");
       if (!fs.existsSync(TTS_DIR)) fs.mkdirSync(TTS_DIR, { recursive: true });
-      const file = ttsFile(id, index, text);
-      if (!fs.existsSync(file)) fs.writeFileSync(file, await geminiWav(text));
-      res.set("Content-Type", "audio/wav").send(fs.readFileSync(file));
+      const base = ttsBase(id, index, text);
+      for (const ext of ["wav", "mp3"]) {
+        const file = `${base}.${ext}`;
+        if (fs.existsSync(file)) return res.set("Content-Type", ext === "wav" ? "audio/wav" : "audio/mpeg").send(fs.readFileSync(file));
+      }
+      const out = await synthesize(text, lang);
+      fs.writeFileSync(`${base}.${out.ext}`, out.buf);
+      res.set("Content-Type", out.ext === "wav" ? "audio/wav" : "audio/mpeg").send(out.buf);
     } catch (e) {
-      fail(e.message || "Lỗi đọc Gemini TTS.");
+      fail(e.message || "Lỗi đọc.");
     }
   });
 };
