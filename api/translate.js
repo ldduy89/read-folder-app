@@ -345,7 +345,7 @@ const syncCfg = () => {
   return c.syncUrl && c.syncSecret ? { url: c.syncUrl, secret: c.syncSecret } : null;
 };
 
-const syncCall = async (cfg, body) => {
+const syncCall = async (cfg, body, what) => {
   const sep = cfg.url.includes("?") ? "&" : "?";
   const res = body
     ? await httpFetch(cfg.url, {
@@ -354,7 +354,7 @@ const syncCall = async (cfg, body) => {
         body: JSON.stringify({ secret: cfg.secret, ...body }),
         timeout: 20000
       })
-    : await httpFetch(`${cfg.url}${sep}secret=${encodeURIComponent(cfg.secret)}`, { timeout: 20000 });
+    : await httpFetch(`${cfg.url}${sep}secret=${encodeURIComponent(cfg.secret)}${what ? "&what=" + encodeURIComponent(what) : ""}`, { timeout: 20000 });
   let data;
   try {
     data = JSON.parse(res.text);
@@ -535,4 +535,142 @@ module.exports = (app) => {
     const { words: rows = [] } = await syncCall(cfg);
     return { ok: true, words: rows.map(fromRow).filter(Boolean) };
   }));
+
+  // ---- Ghi chú (trang /notes): ghi vào tab "Notes" của cùng Sheet, qua cùng Apps Script ----
+  const noteSheetId = (id) => "n:" + id;
+  const noteLocalId = (id) => String(id || "").replace(/^n:/, "");
+  const noteRow = (n) => ({
+    id: noteSheetId(n.id),
+    title: escCell(n.title),
+    content: escCell(n.content),
+    updatedAt: n.updatedAt || Date.now(),
+    createdAt: n.createdAt || n.updatedAt || Date.now()
+  });
+  const fromNoteRow = (r) => {
+    const id = noteLocalId(r.id);
+    if (!id) return null;
+    const title = unescCell(r.title).trim();
+    let updatedAt = typeof r.updatedAt === "number" ? r.updatedAt : Date.parse(r.updatedAt) || 0;
+    const createdAt = typeof r.createdAt === "number" ? r.createdAt : Date.parse(r.createdAt) || updatedAt;
+    return { id, title: title || "(không tiêu đề)", content: unescCell(r.content), updatedAt, createdAt };
+  };
+  const noteCfg = () => {
+    const cfg = syncCfg();
+    if (!cfg) throw new Error("Chưa nhập URL và mã bí mật đồng bộ.");
+    return cfg;
+  };
+
+  app.post("/notes-upsert", guard, json, safe(async (req) => {
+    const n = req.body && req.body.note;
+    if (!n || typeof n.id !== "string" || !n.id || typeof n.title !== "string") return { ok: false, error: "Ghi chú không hợp lệ." };
+    clearTts(n.id); // ghi chú vừa sửa: audio cũ không còn đúng
+    await syncCall(noteCfg(), { action: "note-upsert", note: noteRow(n) });
+    return { ok: true };
+  }));
+
+  app.post("/notes-remove", guard, json, safe(async (req) => {
+    const id = req.body && req.body.id;
+    if (typeof id !== "string" || !id) return { ok: false, error: "Thiếu mã ghi chú." };
+    clearTts(id);
+    await syncCall(noteCfg(), { action: "note-remove", id: noteSheetId(id) });
+    return { ok: true };
+  }));
+
+  app.get("/notes-pull", safe(async () => {
+    const { notes = [] } = await syncCall(noteCfg(), null, "notes");
+    return { ok: true, notes: notes.map(fromNoteRow).filter(Boolean) };
+  }));
+
+  // ---- Đọc ghi chú bằng Gemini TTS, cache file WAV theo từng đoạn ----
+  // File nằm trong api/tts-cache/<noteId>-<đoạn>-<hash nội dung>.wav
+  // Sửa hoặc xoá ghi chú thì xoá toàn bộ file audio của ghi chú đó.
+  const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts";
+  const GEMINI_TTS_VOICE = "Kore";
+  const TTS_DIR = path.join(__dirname, "tts-cache");
+  const crypto = require("crypto");
+
+  const wavFromPcm = (pcm, rate) => {
+    const h = Buffer.alloc(44);
+    h.write("RIFF", 0);
+    h.writeUInt32LE(36 + pcm.length, 4);
+    h.write("WAVE", 8);
+    h.write("fmt ", 12);
+    h.writeUInt32LE(16, 16);
+    h.writeUInt16LE(1, 20); // PCM
+    h.writeUInt16LE(1, 22); // mono
+    h.writeUInt32LE(rate, 24);
+    h.writeUInt32LE(rate * 2, 28);
+    h.writeUInt16LE(2, 32);
+    h.writeUInt16LE(16, 34);
+    h.write("data", 36);
+    h.writeUInt32LE(pcm.length, 40);
+    return Buffer.concat([h, pcm]);
+  };
+
+  // Gọi Gemini, trả về WAV; lỗi thì throw Error có thông báo tiếng Việt
+  const geminiWav = async (text) => {
+    const cfg = getConfig();
+    if (!cfg.geminiKey) throw new Error("Chưa có Gemini API key (vào Cài đặt dịch để nhập).");
+    const r = await httpFetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.geminiKey },
+      timeout: 60000,
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: GEMINI_TTS_VOICE } } }
+        }
+      })
+    });
+    let data = null;
+    try {
+      data = JSON.parse(r.text);
+    } catch (e) {}
+    if (!r.ok) {
+      const msg = (data && data.error && data.error.message) || r.text.slice(0, 200);
+      throw new Error(`Gemini TTS lỗi HTTP ${r.status}: ${msg}`);
+    }
+    const parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+    const inline = Array.isArray(parts) && parts.find((p) => p.inlineData && p.inlineData.data);
+    if (!inline) throw new Error("Gemini không trả về âm thanh.");
+    const rate = Number((/rate=(\d+)/.exec(inline.inlineData.mimeType || "") || [])[1]) || 24000;
+    return wavFromPcm(Buffer.from(inline.inlineData.data, "base64"), rate);
+  };
+
+  // Chỉ cho phép id chữ-số để tên file an toàn
+  const safeNoteId = (id) => String(id || "").replace(/[^A-Za-z0-9]/g, "");
+  const ttsFile = (id, index, text) => {
+    const hash = crypto.createHash("sha1").update(text).digest("hex").slice(0, 10);
+    return path.join(TTS_DIR, `${id}-${index}-${hash}.wav`);
+  };
+
+  // Xoá mọi file audio của một ghi chú
+  const clearTts = (id) => {
+    const sid = safeNoteId(id);
+    if (!sid || !fs.existsSync(TTS_DIR)) return;
+    for (const f of fs.readdirSync(TTS_DIR)) {
+      if (f.startsWith(sid + "-")) {
+        try {
+          fs.unlinkSync(path.join(TTS_DIR, f));
+        } catch (e) {}
+      }
+    }
+  };
+
+  app.post("/notes-tts", guard, json, async (req, res) => {
+    const fail = (error) => res.json({ ok: false, error });
+    try {
+      const id = safeNoteId(req.body && req.body.id);
+      const index = Math.max(0, Math.floor(Number(req.body && req.body.index)) || 0);
+      const text = String((req.body && req.body.text) || "").trim().slice(0, 4000);
+      if (!id || !text) return fail("Không có nội dung để đọc.");
+      if (!fs.existsSync(TTS_DIR)) fs.mkdirSync(TTS_DIR, { recursive: true });
+      const file = ttsFile(id, index, text);
+      if (!fs.existsSync(file)) fs.writeFileSync(file, await geminiWav(text));
+      res.set("Content-Type", "audio/wav").send(fs.readFileSync(file));
+    } catch (e) {
+      fail(e.message || "Lỗi đọc Gemini TTS.");
+    }
+  });
 };
