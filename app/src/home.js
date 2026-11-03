@@ -276,9 +276,13 @@ const SlideSubtitleLayer = React.memo(function SlideSubtitleLayer({ rect, lang, 
       });
       all.sort((a, b) => a.c.startTime - b.c.startTime || a.src - b.src);
       const picked = all
-        .map(({ src, c }) => ({ key: `${src}-${c.startTime}-${c.endTime}-${c.id || ""}`, text: plainSubText(c.text) }))
+        .map(({ src, c }) => ({
+          key: `${src}-${c.startTime}-${c.endTime}-${c.id || ""}`,
+          text: plainSubText(c.text),
+          active: t >= c.startTime && t < c.endTime,
+        }))
         .filter((x) => x.text);
-      const k = picked.map((x) => x.key).join("|");
+      const k = picked.map((x) => `${x.key}${x.active ? "*" : ""}`).join("|");
       if (k !== lastKey) {
         lastKey = k;
         setLines(picked);
@@ -378,6 +382,7 @@ const SlideSubtitleLayer = React.memo(function SlideSubtitleLayer({ rect, lang, 
                 data-sub-seg="1"
                 style={{
                   ...basicSubStyle(unit),
+                  ...(l.active ? { outline: "1px solid rgba(255,204,0,0.9)" } : { filter: "brightness(0.8)" }),
                   pointerEvents: "auto",
                   userSelect: "text",
                   WebkitUserSelect: "text",
@@ -747,6 +752,26 @@ const Home = (props) => {
     if (!isMouse) setIndexFile(0);
     return true;
   };
+
+  // Bấm ra ngoài menu điều khiển (sub, phông, tốc độ, độ trễ, âm thanh) thì đóng menu.
+  // Bấm trong menu hoặc trên thanh điều khiển thì không đóng (các nút trên thanh tự xử lý).
+  const closeBoxesRef = useRef(null);
+  closeBoxesRef.current = () => {
+    const p = popupRef.current;
+    if (p.trWord) return; // cửa sổ dịch tự đóng bằng logic riêng
+    if (!(p.boxTracks || p.boxAudio || p.boxSpeed || p.boxDelay || p.boxFont)) return;
+    let guard = 0;
+    while (guard++ < 6 && closePopupIfOpen());
+  };
+  useEffect(() => {
+    const onDown = (e) => {
+      const t = e.target;
+      if (t && t.closest && t.closest(".v-subtitlesList, .v-controlBar")) return;
+      closeBoxesRef.current();
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, []);
 
   const onBackButtonEvent = (e) => {
     if (closePopupIfOpen()) {
@@ -2224,7 +2249,7 @@ const Home = (props) => {
             style={isMouse && type === "file" ? { width: "96vw", maxWidth: "1800px", height: "auto", overflow: "visible" } : undefined}
           >
             {/* Hàng đầu trang: nút quay lại (icon) + đường dẫn mục. Trang xem file không hiện tên file. */}
-            <div className="flex items-start gap-3 mb-6 min-w-0 pt-4 compact:items-center compact:gap-2 compact:mb-2 compact:px-0 compact:pb-0">
+            <div className="flex items-start gap-3 mb-6 min-w-0 pt-4 compact:flex-wrap compact:items-center compact:gap-2 compact:mb-2 compact:px-0 compact:pb-0">
               {root !== "" && (
                 <Link
                   id={`back_0`}
@@ -2263,7 +2288,7 @@ const Home = (props) => {
                 })}
               </div>
               {isMouse && (
-                <div className="ml-auto flex flex-wrap justify-end gap-2 shrink-0 min-w-0 max-w-full compact:gap-1.5">
+                <div className="ml-auto flex flex-wrap justify-end gap-2 shrink-0 min-w-0 max-w-full compact:order-first compact:w-full compact:ml-0 compact:justify-start compact:gap-1.5">
                   {type === "file" && !audioOnly && (
                     <button
                       type="button"

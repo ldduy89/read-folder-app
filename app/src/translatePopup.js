@@ -157,10 +157,11 @@ const TranslatePopup = ({ apiBase, text, anchor, hoverId, onClose }) => {
       if (cardRef.current && !cardRef.current.contains(e.target)) onClose();
     };
     document.addEventListener("keydown", onKey, true);
-    document.addEventListener("mousedown", onDown, true);
+    // pointerdown: nhận cả chuột, bút và chạm (mousedown có thể bị bỏ qua khi chạm)
+    document.addEventListener("pointerdown", onDown, true);
     return () => {
       document.removeEventListener("keydown", onKey, true);
-      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("pointerdown", onDown, true);
       speaker.stop();
     };
   }, []);
