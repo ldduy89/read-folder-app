@@ -17,7 +17,8 @@ import {
   swipeSelectHandlers,
   recentWordSelect,
   SUB_FONT_CHOICES,
-  setSubFontFamily
+  setSubFontFamily,
+  basicSubStyle
 } from "./assLayer";
 import { getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
 import TranslatePopup from "./translatePopup";
@@ -231,6 +232,174 @@ const SubtitleLayer = React.memo(function SubtitleLayer({ meta, rect, secondaryO
       onWord,
       getTime
     }) || null
+  );
+});
+
+// Kiểu "trượt lên": mỗi câu trượt lên từ dưới, bắt đầu trước giờ bắt đầu của câu 0.4s; hiện tối đa 3 câu cùng lúc
+const SLIDE_LEAD = 0.4;
+const SLIDE_MAX = 3;
+const plainSubText = (t) =>
+  String(t || "")
+    .replace(/\{[^}]*\}/g, "")
+    .replace(/<[^>]+>/g, "")
+    .trim();
+const SlideSubtitleLayer = React.memo(function SlideSubtitleLayer({ rect, lang, secondary, saved, hover, onWord }) {
+  const [lines, setLines] = useState([]);
+  const itemRefs = useRef(new Map());
+  const prevTops = useRef(new Map());
+  const prevLines = useRef([]);
+  const [leaving, setLeaving] = useState([]); // dòng vừa bị đẩy ra: trượt lên và mờ dần rồi mới gỡ
+  const leaveTimers = useRef([]);
+  useEffect(() => () => leaveTimers.current.forEach(clearTimeout), []);
+
+  useEffect(() => {
+    if (!lang && !secondary) return undefined;
+    const tracks = new Map(); // 1 = sub chính, 2 = sub phụ
+    let timer = null;
+    let tick = null;
+    let tries = 0;
+    let lastKey = "";
+    const check = () => {
+      const videoEl = document.getElementsByTagName("video")[0];
+      if (!videoEl) return;
+      const t = videoEl.currentTime;
+      const all = [];
+      const byStart = (a, b) => a.startTime - b.startTime;
+      // Giới hạn 3 dòng tính riêng cho từng sub: dòng thứ 4 của sub nào thì dòng cũ nhất của sub đó bị ẩn.
+      // Dòng sắp đến giờ (trong 0.4s) trượt lên từ dưới nhưng chưa tính vào giới hạn.
+      tracks.forEach((track, src) => {
+        if (!track.cues) return;
+        const started = [];
+        const entering = [];
+        Array.from(track.cues).forEach((c) => {
+          if (c.startTime <= t) started.push(c);
+          else if (c.startTime - SLIDE_LEAD <= t) entering.push(c);
+        });
+        started.sort(byStart).slice(-SLIDE_MAX).forEach((c) => all.push({ src, c }));
+        entering.sort(byStart).forEach((c) => all.push({ src, c }));
+      });
+      all.sort((a, b) => a.c.startTime - b.c.startTime || a.src - b.src);
+      const picked = all
+        .map(({ src, c }) => ({ key: `${src}-${c.startTime}-${c.endTime}-${c.id || ""}`, text: plainSubText(c.text) }))
+        .filter((x) => x.text);
+      const k = picked.map((x) => x.key).join("|");
+      if (k !== lastKey) {
+        lastKey = k;
+        setLines(picked);
+      }
+    };
+    const attach = () => {
+      const videoEl = document.getElementsByTagName("video")[0];
+      const list = videoEl && videoEl.textTracks ? Array.from(videoEl.textTracks) : [];
+      if (lang && !tracks.has(1)) {
+        const tr = list.find((x) => x.language === lang);
+        if (tr) {
+          tr.mode = "hidden"; // hidden vẫn tải đủ cue, chỉ không để trình duyệt tự vẽ
+          tracks.set(1, tr);
+        }
+      }
+      if (secondary && !tracks.has(2)) {
+        const tr = list.find((x) => x.language === secondary);
+        if (tr) {
+          tr.mode = "hidden";
+          tracks.set(2, tr);
+        }
+      }
+      if (tracks.size && !tick) tick = setInterval(check, 50);
+      const done = (!lang || tracks.has(1)) && (!secondary || tracks.has(2));
+      if (!done && tries++ < 120) timer = setTimeout(attach, 500);
+    };
+    attach();
+    return () => {
+      clearTimeout(timer);
+      clearInterval(tick);
+      setLines([]);
+    };
+  }, [lang, secondary]);
+
+  // Các dòng cũ trượt lên mượt khi có dòng mới vào hoặc dòng cũ rời đi (kỹ thuật FLIP)
+  useLayoutEffect(() => {
+    const curKeys = new Set(lines.map((l) => l.key));
+    const gone = prevLines.current.filter((l) => !curKeys.has(l.key));
+    if (gone.length) {
+      const add = gone.map((l) => ({
+        id: `${l.key}-${Date.now()}-${Math.random()}`,
+        text: l.text,
+        top: prevTops.current.get(l.key) || 0,
+      }));
+      setLeaving((ls) => [...ls, ...add]);
+      add.forEach((x) => {
+        leaveTimers.current.push(setTimeout(() => setLeaving((ls) => ls.filter((y) => y.id !== x.id)), 450));
+      });
+    }
+    prevLines.current = lines;
+    const next = new Map();
+    itemRefs.current.forEach((el, key) => {
+      const top = el.offsetTop;
+      const old = prevTops.current.get(key);
+      if (old !== undefined && Math.abs(old - top) > 0.5) {
+        el.style.transition = "none";
+        el.style.transform = `translateY(${old - top}px)`;
+        void el.offsetHeight;
+        el.style.transition = "transform .35s ease-out";
+        el.style.transform = "";
+      }
+      next.set(key, top);
+    });
+    prevTops.current = next;
+  }, [lines]);
+
+  if (!rect || (lines.length === 0 && leaving.length === 0)) return null;
+  return (
+    <>
+      <style>{`@keyframes slideSubUp{from{transform:translateY(120%);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes slideSubOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-70%);opacity:0}}
+.slide-sub.slide-out{animation:slideSubOut .4s ease-in forwards}
+.slide-sub{animation:slideSubUp .4s ease-out backwards;text-align:center;white-space:pre-wrap;max-width:90%;margin-top:4px}`}</style>
+      <div
+        style={{
+          position: "absolute",
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          paddingBottom: rect.height * 0.06,
+          boxSizing: "border-box",
+          overflow: "hidden",
+          pointerEvents: "none",
+          zIndex: 5,
+        }}
+      >
+        {leaving.map((x) => (
+          <div
+            key={x.id}
+            style={{ position: "absolute", left: 0, right: 0, top: x.top, display: "flex", justifyContent: "center", pointerEvents: "none" }}
+          >
+            <div className="slide-sub slide-out" style={basicSubStyle(rect.width / 36)}>
+              {x.text}
+            </div>
+          </div>
+        ))}
+        {lines.map((l) => (
+          <div
+            key={l.key}
+            ref={(el) => (el ? itemRefs.current.set(l.key, el) : itemRefs.current.delete(l.key))}
+            className="slide-sub"
+            data-sub-seg="1"
+            style={{ ...basicSubStyle(rect.width / 36), pointerEvents: "auto", userSelect: "text", WebkitUserSelect: "text", cursor: "text", touchAction: "none" }}
+            {...(onWord ? wordSelectHandlers({ onWord }) : {})}
+            {...(onWord ? swipeSelectHandlers({ onWord }) : {})}
+            {...(onWord && hover ? hoverSavedHandlers(onWord) : {})}
+          >
+            {saved ? highlightSaved(l.text, saved, l.key) : l.text}
+          </div>
+        ))}
+      </div>
+    </>
   );
 });
 
@@ -448,6 +617,20 @@ const Home = (props) => {
     } catch (e) {}
   }, [subFont]);
   const [cuePanelHidden, setCuePanelHidden] = useState(false); // ẩn khung phụ đề bên phải (danh sách câu)
+  // Kiểu hiển thị phụ đề trên video: "classic" (như cũ) hoặc "slide" (trượt lên)
+  const [subStyle, setSubStyle] = useState(() => {
+    try {
+      return localStorage.getItem("subStyle") === "slide" ? "slide" : "classic";
+    } catch (e) {
+      return "classic";
+    }
+  });
+  const chooseSubStyle = (v) => {
+    setSubStyle(v);
+    try {
+      localStorage.setItem("subStyle", v);
+    } catch (e) {}
+  };
   const layoutStacked = stacked || audioOnly; // chỉ nghe thì luôn xếp dọc: thanh điều khiển gọn ở trên, danh sách sub phía dưới
 
   // Điện thoại: nhấn giữ + kéo cột chọn để bôi đen KHÔNG phát mouseup nên không dịch được như trên PC.
@@ -2131,6 +2314,18 @@ const Home = (props) => {
                       <span className="compact:hidden">{cuePanelHidden ? "Hiện khung sub" : "Ẩn khung sub"}</span>
                     </button>
                   )}
+                  {type === "file" && !_.isEmpty(subtitles) && (
+                    <button
+                      type="button"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full bg-transparent font-[inherit] text-white cursor-pointer ${cuePanelHidden ? "!border-[#ffd700] !bg-[rgba(255,215,0,0.2)]" : ""}`}
+                      onClick={() => chooseSubStyle(subStyle === "slide" ? "classic" : "slide")}
+                      aria-pressed={subStyle === "slide"}
+                      title="Đổi kiểu hiển thị phụ đề trên video"
+                      aria-label="Đổi kiểu hiển thị phụ đề"
+                    >
+                                            <span className="compact:hidden">{subStyle === "slide" ? "Sub thường" : "Sub trượt"}</span>
+                    </button>
+                  )}
                   <a
                     className="inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full"
                     href="/translate-words"
@@ -2320,7 +2515,8 @@ const Home = (props) => {
                       />
                     )}
 
-                    {!audioOnly && (
+                    {!audioOnly && subStyle === "slide" && <SlideSubtitleLayer rect={picRect} lang={activeSubLang} secondary={secLang} saved={savedMatcher} hover={isMouse && !touch} onWord={wordStable} />}
+                    {!audioOnly && subStyle !== "slide" && (
                       <SubtitleLayer
                         meta={assMeta}
                         rect={picRect}

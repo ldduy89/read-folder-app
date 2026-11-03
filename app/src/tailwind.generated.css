@@ -8,6 +8,7 @@
   --leading-normal: 1.5;
   --radius-lg: 0.5rem;
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --default-transition-duration: 150ms;
   --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -608,6 +609,10 @@
 .ease-in {
   --tw-ease: var(--ease-in);
   transition-timing-function: var(--ease-in);
+}
+.ease-out {
+  --tw-ease: var(--ease-out);
+  transition-timing-function: var(--ease-out);
 }
 .outline-none {
   --tw-outline-style: none;

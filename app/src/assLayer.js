@@ -35,6 +35,18 @@ const subLineHeight = () => {
 const SUB_COLOR = DEFAULT_ASS_STYLE.primary;
 // true: mọi sub dùng SUB_COLOR; false: dùng màu trong file sub (style và thẻ {\c&H...&})
 const SUB_COLOR_FORCE = true;
+// Kiểu chữ cơ bản của sub (font, màu, đậm, nền đen từng dòng), dùng chung cho kiểu trượt lên
+export const basicSubStyle = (fontSize) => ({
+  fontFamily: subFontFamily,
+  fontSize,
+  fontWeight: 600,
+  color: SUB_COLOR,
+  background: TEXT_BOX,
+  lineHeight: subLineHeight(),
+  padding: "0.04em 0.28em",
+  display: "inline-block",
+});
+
 // Chiều cao dòng (không đơn vị nên tự co giãn theo cỡ chữ). Mỗi dòng sub có nền đen riêng, vẽ theo chiều cao nội tại của font
 // (font UVN La Xanh: ascent 1.112em + descent 0.251em = 1.363em) cộng padding dọc 2 x 0.04em = 1.443em.
 // Nếu line-height nhỏ hơn số này thì nền đen của dòng dưới đè lên phần đuôi chữ (g, p, y, dấu nặng...) của dòng trên.
