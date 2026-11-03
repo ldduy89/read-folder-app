@@ -583,6 +583,61 @@ const pipeFileVtt = (res, filePath) => {
   });
 };
 
+// ---- Nối câu cho file phụ đề có "-c" trước đuôi (ví dụ sub-c.srt) ----
+// Cue chưa kết thúc bằng . ! ? … sẽ được nối với cue kế tiếp, tối đa 30 giây cho một câu nối.
+const MERGE_SRT = /-c\.srt$/i;
+const MERGE_MAX_MS = 30000;
+const srtTimeMs = (t) => {
+  const [hms, frac] = t.replace(",", ".").split(".");
+  const [h, m, sec] = hms.split(":").map(Number);
+  return ((h * 60 + m) * 60 + sec) * 1000 + Math.round(Number("0." + (frac || "0")) * 1000);
+};
+const vttTime = (ms) => {
+  const p2 = (n) => String(n).padStart(2, "0");
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const r = ms % 1000;
+  return `${p2(h)}:${p2(m)}:${p2(s)}.${String(r).padStart(3, "0")}`;
+};
+const cleanSrtText = (t) =>
+  t
+    .replace(/\{\\([ibu])\}/g, "<$1>")
+    .replace(/\{\/([ibu])\}/g, "</$1>")
+    .replace(/\{\\\/([ibu])\}/g, "</$1>")
+    .replace(/\{\\[^}]*\}/g, "")
+    .replace(/\\N/g, "\n");
+const parseSrtCues = (text) => {
+  const cues = [];
+  for (const block of text.replace(/\r/g, "").split(/\n\s*\n/)) {
+    const lines = block.split("\n").filter((l) => l.trim() !== "");
+    const i = lines.findIndex((l) => l.includes("-->"));
+    if (i < 0) continue;
+    const m = /(\d{1,2}:\d{2}:\d{2}[,.]\d{1,3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,.]\d{1,3})/.exec(lines[i]);
+    if (!m) continue;
+    cues.push({ start: srtTimeMs(m[1]), end: srtTimeMs(m[2]), text: cleanSrtText(lines.slice(i + 1).join("\n")) });
+  }
+  return cues;
+};
+const endsSentence = (t) => /[.!?…]["'”’)\]]*$/.test(t.trim());
+const mergeSrtCues = (cues) => {
+  const out = [];
+  let cur = null;
+  for (const c of cues) {
+    if (cur && !endsSentence(cur.text) && c.end - cur.start <= MERGE_MAX_MS) {
+      cur.text = cur.text.replace(/\s*\n\s*/g, " ").trim() + " " + c.text.replace(/\s*\n\s*/g, " ").trim();
+      cur.end = c.end;
+    } else {
+      if (cur) out.push(cur);
+      cur = { ...c };
+    }
+  }
+  if (cur) out.push(cur);
+  return out;
+};
+const cuesToVtt = (cues) =>
+  "WEBVTT\n\n" + cues.map((c, i) => `${i + 1}\n${vttTime(c.start)} --> ${vttTime(c.end)}\n${c.text}\n`).join("\n");
+
 app.get("/subtitles/*", function (req, res) {
   try {
     const fullPath = req.params[0].split("/").filter((p) => !!p);
@@ -602,6 +657,15 @@ app.get("/subtitles/*", function (req, res) {
           console.log("ass parse error", error.message);
         }
         pipeVtt(res, strstream(ass2srt(fs.readFileSync(subPath))));
+      } else if (MERGE_SRT.test(subPath)) {
+        try {
+          const cues = parseSrtCues(assLib.decodeText(fs.readFileSync(subPath)));
+          sendVtt(res, cuesToVtt(mergeSrtCues(cues)));
+          return;
+        } catch (error) {
+          console.log("srt merge error", error.message);
+        }
+        pipeFileVtt(res, subPath);
       } else {
         pipeFileVtt(res, subPath);
       }

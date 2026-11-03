@@ -1,6 +1,6 @@
 // translateWords.js — trang "Từ đã lưu" + cài đặt dịch, mở ở /translate-words (chuyển từ words.html / options.html của extension)
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { apiBaseOf, apiGet, copyText, createSpeaker, getTarget, getWords, googleDirect, isSingleWordText, setWords, syncNow, syncOps, wordId } from "./translateLib";
+import { apiBaseOf, apiGet, copyText, createSpeaker, getTarget, getWords, googleDirect, isSingleWordText, setWords, syncNotesNow, syncNow, syncOps, syncSummary, wordId } from "./translateLib";
 
 export const CSS = `
 .tw{--bg:#282c34;--fg:#e6e6e6;--muted:#9aa0a6;--line:#3e4451;--hover:#333a45;--head:#2e333d;--accent:#61afef;min-height:100vh;background:var(--bg);color:var(--fg);font:13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;box-sizing:border-box}
@@ -236,9 +236,10 @@ const Words = () => {
 
   const doSync = async () => {
     setSync({ busy: true, text: "Đang đồng bộ…", err: false });
-    const r = await syncNow(apiBase);
+    const [w, n] = await Promise.all([syncNow(apiBase), syncNotesNow(apiBase)]);
     setList(getWords());
-    setSync(r.ok ? { busy: false, text: `Đã đồng bộ ✓ (kéo về ${r.pulled}, đẩy lên ${r.pushed})`, err: false } : { busy: false, text: r.error || "Không đồng bộ được.", err: true });
+    const s2 = syncSummary(w, n);
+    setSync({ busy: false, text: s2.text, err: s2.err });
   };
 
   return (

@@ -3,7 +3,7 @@
 // Lưu trên trình duyệt trước; có cấu hình đồng bộ thì đẩy lên tab "Notes" của Google Sheet.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiBaseOf, apiGet, apiPost, chunkText, getWords, WORDS_EVENT, WORDS_KEY } from "./translateLib";
+import { apiBaseOf, apiPost, chunkText, getWords, syncNotesNow, syncNow, syncSummary, WORDS_EVENT, WORDS_KEY } from "./translateLib";
 import { buildSavedMatcher, highlightSaved, hoverSavedHandlers, swipeSelectHandlers, wordSelectHandlers } from "./assLayer";
 import TranslatePopup from "./translatePopup";
 
@@ -352,35 +352,13 @@ const Notes = () => {
     report(await call("/notes-remove", { id }), "Đã xóa trên Sheet ✓");
   };
 
-  // Gộp hai chiều: bản mới hơn (theo updatedAt) thắng; máy nào mới hơn thì đẩy lên Sheet
+  // Đồng bộ cả từ đã lưu và ghi chú
   const syncAll = async () => {
     setSync({ busy: true, text: "Đang đồng bộ…", err: false });
-    const r = await apiGet(apiBase, "/notes-pull").catch(() => ({ ok: false, error: "Không kết nối được máy chủ." }));
-    if (!r.ok) return setSync({ busy: false, text: r.error || "Không đồng bộ được.", err: true });
-
-    const remote = r.notes || [];
-    const remoteById = new Map(remote.map((n) => [n.id, n]));
-    const merged = new Map(loadNotes().map((n) => [n.id, n]));
-    let pulled = 0;
-    remote.forEach((rn) => {
-      const ln = merged.get(rn.id);
-      if (!ln || (rn.updatedAt || 0) > (ln.updatedAt || 0)) {
-        merged.set(rn.id, rn);
-        pulled++;
-      }
-    });
-    const list = [...merged.values()];
-    commit(list);
-
-    let pushed = 0;
-    for (const n of list) {
-      const rn = remoteById.get(n.id);
-      if (!rn || (n.updatedAt || 0) > (rn.updatedAt || 0)) {
-        await call("/notes-upsert", { note: n });
-        pushed++;
-      }
-    }
-    setSync({ busy: false, text: `Đã đồng bộ ✓ (kéo về ${pulled}, đẩy lên ${pushed})`, err: false });
+    const [w, n] = await Promise.all([syncNow(apiBase), syncNotesNow(apiBase)]);
+    setNotes(sortNotes(loadNotes()));
+    const s2 = syncSummary(w, n);
+    setSync({ busy: false, text: s2.text, err: s2.err });
   };
 
   const openEdit = (note) => setModal({ id: note.id, title: note.title, content: note.content || "", err: "" });

@@ -63,6 +63,57 @@ export const syncNow = async (apiBase) => {
   }
 };
 
+// ---- Đồng bộ ghi chú (dùng chung cho trang Ghi chú và trang Từ đã lưu) ----
+export const NOTES_KEY = "cctNotes";
+const loadNotesLocal = () => {
+  try {
+    const list = JSON.parse(localStorage.getItem(NOTES_KEY) || "[]");
+    return Array.isArray(list) ? list.filter((n) => n && n.id) : [];
+  } catch (e) {
+    return [];
+  }
+};
+const saveNotesLocal = (list) => {
+  try {
+    localStorage.setItem(NOTES_KEY, JSON.stringify(list));
+  } catch (e) {}
+};
+// Gộp hai chiều: bản mới hơn (theo updatedAt) thắng; máy nào mới hơn thì đẩy lên Sheet
+export const syncNotesNow = async (apiBase) => {
+  const r = await apiGet(apiBase, "/notes-pull").catch(() => ({ ok: false, error: "Không kết nối được máy chủ." }));
+  if (!r.ok) return { ok: false, error: r.error || "Không đồng bộ được ghi chú." };
+  const remote = r.notes || [];
+  const remoteById = new Map(remote.map((n) => [n.id, n]));
+  const merged = new Map(loadNotesLocal().map((n) => [n.id, n]));
+  let pulled = 0;
+  remote.forEach((rn) => {
+    const ln = merged.get(rn.id);
+    if (!ln || (rn.updatedAt || 0) > (ln.updatedAt || 0)) {
+      merged.set(rn.id, rn);
+      pulled++;
+    }
+  });
+  const list = [...merged.values()];
+  saveNotesLocal(list);
+  let pushed = 0;
+  for (const n of list) {
+    const rn = remoteById.get(n.id);
+    if (!rn || (n.updatedAt || 0) > (rn.updatedAt || 0)) {
+      await apiPost(apiBase, "/notes-upsert", { note: n }).catch(() => {});
+      pushed++;
+    }
+  }
+  return { ok: true, pulled, pushed };
+};
+
+// Tóm tắt kết quả đồng bộ từ cả hai phần (từ và ghi chú)
+export const syncSummary = (w, n) => {
+  const wPart = w.ok ? `từ: kéo ${w.pulled}, đẩy ${w.pushed}` : `từ: ${w.error || "lỗi"}`;
+  const nPart = n.ok ? `ghi chú: kéo ${n.pulled}, đẩy ${n.pushed}` : `ghi chú: ${n.error || "lỗi"}`;
+  const ok = !!(w.ok && n.ok);
+  return { ok, err: !ok, text: (ok ? "Đã đồng bộ ✓ — " : "Đồng bộ chưa xong — ") + wPart + " · " + nPart };
+};
+
 // ---- Gọi Google Translate trực tiếp từ trình duyệt (IP của người dùng, không qua server) ----
 // Chỉ dùng cho từ đơn. Lỗi (bị chặn, mạng...) thì trả null để gọi server như cũ.
 export const isSingleWordText = (t) => {
