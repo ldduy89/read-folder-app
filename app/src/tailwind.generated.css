@@ -392,6 +392,9 @@
 .\!pt-\[0\.2em\] {
   padding-top: 0.2em !important;
 }
+.\!pt-\[0\.6em\] {
+  padding-top: 0.6em !important;
+}
 .\!pt-\[0\.8em\] {
   padding-top: 0.8em !important;
 }
@@ -525,8 +528,8 @@
   --tw-font-weight: var(--font-weight-medium);
   font-weight: var(--font-weight-medium);
 }
-.\[overflow-wrap\:anywhere\] {
-  overflow-wrap: anywhere;
+.\[overflow-wrap\:break-word\] {
+  overflow-wrap: break-word;
 }
 .break-words {
   overflow-wrap: break-word;

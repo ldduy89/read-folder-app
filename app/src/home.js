@@ -243,15 +243,11 @@ const plainSubText = (t) =>
     .replace(/\{[^}]*\}/g, "")
     .replace(/<[^>]+>/g, "")
     .trim();
-const SlideSubtitleLayer = React.memo(function SlideSubtitleLayer({ rect, lang, secondary, saved, hover, onWord }) {
+const SlideSubtitleLayer = React.memo(function SlideSubtitleLayer({ rect, lang, secondary, controlsHidden, saved, hover, onWord }) {
   const [lines, setLines] = useState([]);
   const itemRefs = useRef(new Map());
-  const prevTops = useRef(new Map());
-  const prevLines = useRef([]);
-  const [leaving, setLeaving] = useState([]); // dòng vừa bị đẩy ra: trượt lên và mờ dần rồi mới gỡ
-  const leaveTimers = useRef([]);
-  useEffect(() => () => leaveTimers.current.forEach(clearTimeout), []);
-
+  const colRef = useRef(null); // khối chứa toàn bộ dòng: trượt lên như một đoạn văn
+  const lastRef = useRef(null); // {key, dist}: khoảng cách từ đáy dòng cuối tới đáy khối (để đo độ dịch)
   useEffect(() => {
     if (!lang && !secondary) return undefined;
     const tracks = new Map(); // 1 = sub chính, 2 = sub phụ
@@ -317,45 +313,36 @@ const SlideSubtitleLayer = React.memo(function SlideSubtitleLayer({ rect, lang, 
     };
   }, [lang, secondary]);
 
-  // Các dòng cũ trượt lên mượt khi có dòng mới vào hoặc dòng cũ rời đi (kỹ thuật FLIP)
+  // Cả khối trượt lên cùng một tốc độ. Khi có dòng mới ở đáy, khối được dịch xuống đúng bằng phần chiều cao
+  // dòng mới rồi trượt về vị trí, trong SLIDE_LEAD giây (đúng lúc dòng đó đến giờ hiện).
   useLayoutEffect(() => {
-    const curKeys = new Set(lines.map((l) => l.key));
-    const gone = prevLines.current.filter((l) => !curKeys.has(l.key));
-    if (gone.length) {
-      const add = gone.map((l) => ({
-        id: `${l.key}-${Date.now()}-${Math.random()}`,
-        text: l.text,
-        top: prevTops.current.get(l.key) || 0,
-      }));
-      setLeaving((ls) => [...ls, ...add]);
-      add.forEach((x) => {
-        leaveTimers.current.push(setTimeout(() => setLeaving((ls) => ls.filter((y) => y.id !== x.id)), 450));
-      });
-    }
-    prevLines.current = lines;
-    const next = new Map();
-    itemRefs.current.forEach((el, key) => {
-      const top = el.offsetTop;
-      const old = prevTops.current.get(key);
-      if (old !== undefined && Math.abs(old - top) > 0.5) {
-        el.style.transition = "none";
-        el.style.transform = `translateY(${old - top}px)`;
-        void el.offsetHeight;
-        el.style.transition = "transform .35s ease-out";
-        el.style.transform = "";
+    const col = colRef.current;
+    if (!col) return;
+    const distOf = (el) => col.offsetHeight - (el.offsetTop + el.offsetHeight);
+    const prev = lastRef.current;
+    const prevEl = prev && itemRefs.current.get(prev.key);
+    if (prevEl) {
+      const shift = distOf(prevEl) - prev.dist;
+      if (Math.abs(shift) > 0.5) {
+        col.style.transition = "none";
+        col.style.transform = `translateY(${shift}px)`;
+        void col.offsetHeight;
+        col.style.transition = `transform ${SLIDE_LEAD}s ease-out`;
+        col.style.transform = "";
       }
-      next.set(key, top);
-    });
-    prevTops.current = next;
+    }
+    const last = lines[lines.length - 1];
+    const lastEl = last && itemRefs.current.get(last.key);
+    lastRef.current = lastEl ? { key: last.key, dist: distOf(lastEl) } : null;
   }, [lines]);
 
-  if (!rect || (lines.length === 0 && leaving.length === 0)) return null;
+  if (!rect || lines.length === 0) return null;
+  const unit = rect.width / 36; // cỡ chữ cơ bản, cùng công thức với sub thường
+  const bs = basicSubStyle(unit);
+  const viewH = Math.round((unit * bs.lineHeight + unit * 0.08 + 4) * 3); // khung cố định cao đúng 3 dòng
   return (
     <>
-      <style>{`@keyframes slideSubUp{from{transform:translateY(120%);opacity:0}to{transform:translateY(0);opacity:1}}
-@keyframes slideSubOut{from{transform:translateY(0);opacity:1}to{transform:translateY(-70%);opacity:0}}
-.slide-sub.slide-out{animation:slideSubOut .4s ease-in forwards}
-.slide-sub{animation:slideSubUp .4s ease-out backwards;text-align:center;white-space:pre-wrap;max-width:90%;margin-top:4px}`}</style>
+      <style>{`.slide-sub{text-align:center;white-space:pre-wrap;max-width:90%;margin-top:4px}`}</style>
       <div
         style={{
           position: "absolute",
@@ -367,37 +354,45 @@ const SlideSubtitleLayer = React.memo(function SlideSubtitleLayer({ rect, lang, 
           flexDirection: "column",
           justifyContent: "flex-end",
           alignItems: "center",
-          paddingBottom: rect.height * 0.06,
+          // Thanh điều khiển đang hiện: nâng phụ đề lên trên thanh (cùng cách với sub thường); ẩn thì hạ xuống sát đáy
+          paddingBottom: controlsHidden
+            ? rect.height * 0.06
+            : `calc(var(--width-bar, 50px) + var(--bar-gap, 0px) + ${Math.max(10, Math.round(rect.height * 0.03))}px)`,
+          transition: "padding-bottom .25s ease-in",
           boxSizing: "border-box",
           overflow: "hidden",
           pointerEvents: "none",
-          zIndex: 5,
+          zIndex: controlsHidden ? 35 : 15,
         }}
       >
-        {leaving.map((x) => (
+        <div style={{ position: "relative", width: "100%", height: viewH, flexShrink: 0, overflow: "hidden", pointerEvents: "none" }}>
           <div
-            key={x.id}
-            style={{ position: "absolute", left: 0, right: 0, top: x.top, display: "flex", justifyContent: "center", pointerEvents: "none" }}
+            ref={colRef}
+            style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", flexDirection: "column", alignItems: "center", pointerEvents: "none" }}
           >
-            <div className="slide-sub slide-out" style={basicSubStyle(rect.width / 36)}>
-              {x.text}
-            </div>
+            {lines.map((l) => (
+              <div
+                key={l.key}
+                ref={(el) => (el ? itemRefs.current.set(l.key, el) : itemRefs.current.delete(l.key))}
+                className="slide-sub"
+                data-sub-seg="1"
+                style={{
+                  ...basicSubStyle(unit),
+                  pointerEvents: "auto",
+                  userSelect: "text",
+                  WebkitUserSelect: "text",
+                  cursor: "text",
+                  touchAction: "none",
+                }}
+                {...(onWord ? wordSelectHandlers({ onWord }) : {})}
+                {...(onWord ? swipeSelectHandlers({ onWord }) : {})}
+                {...(onWord && hover ? hoverSavedHandlers(onWord) : {})}
+              >
+                {saved ? highlightSaved(l.text, saved, l.key) : l.text}
+              </div>
+            ))}
           </div>
-        ))}
-        {lines.map((l) => (
-          <div
-            key={l.key}
-            ref={(el) => (el ? itemRefs.current.set(l.key, el) : itemRefs.current.delete(l.key))}
-            className="slide-sub"
-            data-sub-seg="1"
-            style={{ ...basicSubStyle(rect.width / 36), pointerEvents: "auto", userSelect: "text", WebkitUserSelect: "text", cursor: "text", touchAction: "none" }}
-            {...(onWord ? wordSelectHandlers({ onWord }) : {})}
-            {...(onWord ? swipeSelectHandlers({ onWord }) : {})}
-            {...(onWord && hover ? hoverSavedHandlers(onWord) : {})}
-          >
-            {saved ? highlightSaved(l.text, saved, l.key) : l.text}
-          </div>
-        ))}
+        </div>
       </div>
     </>
   );
@@ -2241,7 +2236,7 @@ const Home = (props) => {
                   <ArrowBackIcon />
                 </Link>
               )}
-              <div className="flex-[1_1_auto] min-w-0 pt-[7px] leading-[1.3] [overflow-wrap:anywhere] compact:pt-0 compact:text-[15px]">
+              <div className="flex-[1_1_auto] min-w-0 pt-[7px] leading-[1.3] [overflow-wrap:break-word] compact:pt-0 compact:text-[15px]">
                 <b>
                   {root !== "" ? (
                     <Link id={`path_0`} to="/">
@@ -2312,18 +2307,6 @@ const Home = (props) => {
                     >
                       {cuePanelHidden ? <PanelHiddenIcon width="16" height="16" /> : <PanelIcon width="16" height="16" />}
                       <span className="compact:hidden">{cuePanelHidden ? "Hiện khung sub" : "Ẩn khung sub"}</span>
-                    </button>
-                  )}
-                  {type === "file" && !_.isEmpty(subtitles) && (
-                    <button
-                      type="button"
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 text-[15px] leading-[1.4] text-white no-underline whitespace-nowrap border border-[rgba(255,255,255,0.35)] rounded-lg hover:bg-[rgba(255,255,255,0.14)] focus-visible:bg-[rgba(255,255,255,0.14)] hover:border-[rgba(255,255,255,0.7)] focus-visible:border-[rgba(255,255,255,0.7)] compact:box-border compact:w-[34px] compact:h-[34px] compact:p-0 compact:justify-center compact:text-[17px] compact:rounded-full bg-transparent font-[inherit] text-white cursor-pointer ${cuePanelHidden ? "!border-[#ffd700] !bg-[rgba(255,215,0,0.2)]" : ""}`}
-                      onClick={() => chooseSubStyle(subStyle === "slide" ? "classic" : "slide")}
-                      aria-pressed={subStyle === "slide"}
-                      title="Đổi kiểu hiển thị phụ đề trên video"
-                      aria-label="Đổi kiểu hiển thị phụ đề"
-                    >
-                                            <span className="compact:hidden">{subStyle === "slide" ? "Sub thường" : "Sub trượt"}</span>
                     </button>
                   )}
                   <a
@@ -2515,7 +2498,7 @@ const Home = (props) => {
                       />
                     )}
 
-                    {!audioOnly && subStyle === "slide" && <SlideSubtitleLayer rect={picRect} lang={activeSubLang} secondary={secLang} saved={savedMatcher} hover={isMouse && !touch} onWord={wordStable} />}
+                    {!audioOnly && subStyle === "slide" && <SlideSubtitleLayer rect={picRect} lang={activeSubLang} secondary={secLang} controlsHidden={controlsHidden} saved={savedMatcher} hover={isMouse && !touch} onWord={wordStable} />}
                     {!audioOnly && subStyle !== "slide" && (
                       <SubtitleLayer
                         meta={assMeta}
@@ -2792,6 +2775,12 @@ const Home = (props) => {
                                     ))}
                                 </ul>
                               )}
+                            </div>
+                            {/* Kiểu hiển thị phụ đề trên video: thường / trượt lên */}
+                            <div className="!mt-[0.3em] !pt-[0.6em] !px-[0.3em] !border-t !border-solid !border-[#e6e8ec]" onClick={(e) => e.stopPropagation()}>
+                              <TrackButton active={subStyle === "slide"} onClick={() => chooseSubStyle(subStyle === "slide" ? "classic" : "slide")}>
+                                Kiểu trượt lên
+                              </TrackButton>
                             </div>
                             {/* Chỉnh độ trễ phụ đề: lùi / tới / reset (PC + điện thoại; TV dùng nút đồng hồ riêng) */}
                             {isMouse && (
