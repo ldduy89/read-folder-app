@@ -384,8 +384,8 @@ const probeAudio = (file) =>
         try {
           streams = JSON.parse(stdout).streams || [];
         } catch (e) {}
-        let defaultIndex = streams.findIndex((st) => st.disposition && st.disposition.default === 1);
-        if (defaultIndex < 0) defaultIndex = 0;
+        // Luôn coi audio đầu tiên là mặc định (trình duyệt phát track đầu của file gốc, không theo cờ default trong file)
+        const defaultIndex = 0;
         resolve(
           streams.map((st, i) => ({
             index: i,
@@ -403,14 +403,54 @@ const probeAudio = (file) =>
 const audioCachePath = (fullPath, track) => path.join(audioDir, ..._.dropRight(fullPath), `${_.last(fullPath)}.a${track}.m4a`);
 
 // Tách 1 audio track ra file .m4a riêng (có cache) để trình duyệt phát song song với video
-const probeDuration = (file) =>
+const runProbe = (args) =>
   new Promise((resolve) => {
-    execFile(ffprobePath, ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], (err, stdout) =>
-      resolve(err ? 0 : parseFloat(stdout) || 0)
+    execFile(ffprobePath, args, { maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => resolve({ err, stdout: String(stdout || ""), stderr: String(stderr || "") }));
+  });
+
+// Độ dài file (giây). Thử lần lượt: duration của container -> duration lớn nhất của các stream -> thời điểm gói tin cuối cùng
+// (file mp4 vừa remux đôi khi không ghi duration ở container nên ffprobe trả về N/A)
+const probeDuration = async (file, hint = 0) => {
+  const num = (v) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  const r1 = await runProbe(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]);
+  if (r1.err) console.log("probeDuration error:", file, (r1.stderr || r1.err.message).trim().slice(0, 300));
+  const d1 = num(r1.stdout);
+  if (d1) return d1;
+  // ffprobe (bản đi kèm) có thể cũ hơn ffmpeg đã tạo file nên không đọc được: nhờ chính ffmpeg đọc "Duration: hh:mm:ss.xx"
+  const dm = await new Promise((resolve) => {
+    execFile(ffmpegPath, ["-hide_banner", "-i", file], { maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
+      const m = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(String(stderr || ""));
+      resolve(m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0);
+    });
+  });
+  if (dm) return dm;
+  const r2 = await runProbe(["-v", "error", "-show_entries", "stream=duration", "-of", "csv=p=0", file]);
+  const d2 = Math.max(0, ...r2.stdout.split(/\r?\n/).map(num));
+  if (d2) return d2;
+  // Đọc các gói tin audio ở đoạn cuối file (nhẹ, không giải mã)
+  const from = Math.max(0, Math.floor(hint - 60));
+  const r3 = await runProbe(["-v", "error", "-select_streams", "a:0", "-show_entries", "packet=pts_time,duration_time", "-read_intervals", `${from}%`, "-of", "csv=p=0", file]);
+  let last = 0;
+  r3.stdout.split(/\r?\n/).forEach((line) => {
+    const [pts, dur] = line.split(",");
+    const end = num(pts) + num(dur);
+    if (end > last) last = end;
+  });
+  return last;
+};
+
+// Codec video của track đầu tiên (ví dụ "hevc", "h264", "av1"); lỗi thì trả về ""
+const probeVideoCodec = (file) =>
+  new Promise((resolve) => {
+    execFile(ffprobePath, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "csv=p=0", file], (err, stdout) =>
+      resolve(err ? "" : String(stdout).trim())
     );
   });
 
-const startAudioExtract = async (file, track, out, mux = false) => {
+const startAudioExtract = async (file, track, out, mux = false, fmt = "mp4") => {
   const job = { error: false };
   audioJobs.set(out, job);
   const tmp = out + ".part";
@@ -419,22 +459,34 @@ const startAudioExtract = async (file, track, out, mux = false) => {
     const info = list[track];
     if (!info) throw new Error("Khong co audio track " + track);
     fsExtra.ensureDirSync(path.dirname(out));
-    const codecArgs = info.codec === "aac" ? ["-c:a", "copy"] : ["-c:a", "aac", "-b:a", info.channels > 2 ? "384k" : "192k"];
-    const maps = mux ? ["-map", "0:v:0", "-map", `0:a:${track}`, "-c:v", "copy"] : ["-map", `0:a:${track}`, "-vn"];
+    // Safari chỉ phát HEVC trong mp4 khi có tag hvc1
+    const vcodec = mux ? await probeVideoCodec(file) : "";
+    if (mux) console.log("remux video codec:", file, vcodec || "unknown");
+    const vtag = vcodec === "hevc" ? ["-tag:v", "hvc1"] : [];
+    const maps = mux ? ["-map", "0:v:0", "-map", `0:a:${track}`, "-c:v", "copy", ...vtag] : ["-map", `0:a:${track}`, "-vn"];
     // mux: tạo lại timestamp để tránh file bị cụt (player dừng sớm)
     const fixArgs = mux ? ["-fflags", "+genpts"] : [];
-    const args = ["-y", "-v", "error", ...fixArgs, "-i", file, ...maps, "-sn", "-dn", ...codecArgs, "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", "-f", "mp4", tmp];
-    console.log("audio extract:", file, "track", track, info.codec);
-    await new Promise((resolve, reject) => {
-      const proc = spawn(ffmpegPath, args);
-      let err = "";
-      proc.stderr.on("data", (d) => (err += d.toString()));
-      proc.on("error", reject);
-      proc.on("close", (code) => (code === 0 ? resolve() : reject(new Error(err || `ffmpeg exit ${code}`))));
-    });
+    // AAC: copy nguyên; còn lại: chuyển thẳng sang MP3 (MP3 trong mp4 vẫn được Safari phát)
+    const audioArgs = info.codec === "aac" ? ["-c:a", "copy"] : ["-c:a", "libmp3lame", "-b:a", info.channels > 2 ? "320k" : "192k"];
+    const runFfmpeg = (ffArgs) =>
+      new Promise((resolve, reject) => {
+        const proc = spawn(ffmpegPath, ffArgs);
+        let err = "";
+        proc.stderr.on("data", (d) => (err += d.toString()));
+        proc.on("error", reject);
+        proc.on("close", (code) => (code === 0 ? resolve() : reject(new Error(err || `ffmpeg exit ${code}`))));
+      });
+    // mkv: giữ nguyên video + đúng 1 audio được chọn, không mã hoá lại (ffmpeg -i in.mkv -map 0:v -map 0:a:N -c copy out.mkv)
+    const useMkv = mux && fmt === "mkv";
+    const ffArgs = useMkv
+      ? ["-y", "-v", "error", "-i", file, "-map", "0:v", "-map", `0:a:${track}`, "-c", "copy", "-f", "matroska", tmp]
+      : ["-y", "-v", "error", ...fixArgs, "-i", file, ...maps, "-sn", "-dn", ...audioArgs, "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", "-f", "mp4", tmp];
+    console.log("audio extract:", file, "track", track, info.codec, "->", useMkv ? "copy (mkv)" : audioArgs[1]);
+    await runFfmpeg(ffArgs);
     if (mux) {
       // kiểm tra file remux có đủ độ dài so với file gốc, nếu cụt thì báo lỗi thay vì dùng
-      const [srcDur, outDur] = [await probeDuration(file), await probeDuration(tmp)];
+      const srcDur = await probeDuration(file);
+      const outDur = await probeDuration(tmp, srcDur);
       console.log("remux duration:", file, "src", srcDur, "out", outDur);
       if (srcDur > 0 && outDur < srcDur * 0.95) throw new Error(`remux cut: ${outDur}s / ${srcDur}s`);
     }
@@ -511,21 +563,23 @@ app.get("/audio-file/*", (req, res) => {
 });
 
 // ================= VIDEO + AUDIO ĐÃ CHỌN (1 file mp4, không cần thẻ audio riêng) =================
-const mediaCachePath = (fullPath, track) => path.join(audioDir, ..._.dropRight(fullPath), `${_.last(fullPath)}.v${track}.mp4`);
+const getFmt = (req) => (req.query.fmt === "mkv" ? "mkv" : "mp4");
+const mediaCachePath = (fullPath, track, fmt = "mp4") => path.join(audioDir, ..._.dropRight(fullPath), `${_.last(fullPath)}.v${track}.${fmt}`);
 
 // Chuẩn bị file mux: { ready: true } | { waiting: true } | { error: true }
 app.get("/media-prepare/*", (req, res) => {
   const track = parseInt(req.query.track, 10);
   const m = resolveMediaFile(req.params[0]);
   if (!m || isNaN(track) || track < 0 || !fs.existsSync(m.file)) return res.status(400).send({ error: true });
-  const out = mediaCachePath(m.fullPath, track);
+  const fmt = getFmt(req);
+  const out = mediaCachePath(m.fullPath, track, fmt);
   if (fs.existsSync(out)) return res.send({ ready: true });
   const job = audioJobs.get(out);
   if (job && job.error) {
     audioJobs.delete(out);
     return res.send({ error: true });
   }
-  if (!job) enqueueJob(out, () => startAudioExtract(m.file, track, out, true));
+  if (!job) enqueueJob(out, () => startAudioExtract(m.file, track, out, true, fmt));
   res.send({ waiting: true });
 });
 
@@ -534,9 +588,10 @@ app.get("/media-file/*", (req, res) => {
   const track = parseInt(req.query.track, 10);
   const m = resolveMediaFile(req.params[0]);
   if (!m || isNaN(track) || track < 0) return res.sendStatus(400);
-  const out = mediaCachePath(m.fullPath, track);
+  const fmt = getFmt(req);
+  const out = mediaCachePath(m.fullPath, track, fmt);
   if (!fs.existsSync(out)) return res.sendStatus(404);
-  res.type("video/mp4");
+  res.type(fmt === "mkv" ? "video/x-matroska" : "video/mp4");
   res.sendFile(out, { dotfiles: "allow" }, (e) => {
     if (e && !res.headersSent) res.sendStatus(e.status || 500);
   });
@@ -806,7 +861,7 @@ const cleanSubs = async (fileNames, fullPath) => {
 };
 
 // Xoá cache audio/video đã remux của file không còn tồn tại, hoặc file gốc đã bị thay đổi sau khi tạo cache
-const CACHE_FILE = /^(.+)\.(v\d+\.mp4|a\d+\.m4a)(\.part)?$/;
+const CACHE_FILE = /^(.+)\.(v\d+\.(?:mp4|mkv)|a\d+\.m4a)(\.part)?$/;
 const cleanMediaCache = (folderNames, fullPath, dir) => {
   try {
     const cacheDir = path.join(audioDir, ...fullPath);

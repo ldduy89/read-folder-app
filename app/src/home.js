@@ -494,6 +494,8 @@ const Home = (props) => {
   const audiosURL = `http://${hostname}:80/audios/`;
   const mediaPrepareURL = `http://${hostname}:80/media-prepare/`;
   const mediaURL = `http://${hostname}:80/media-file/`;
+  const audioPrepareURL = `http://${hostname}:80/audio-prepare/`;
+  const audioFileURL = `http://${hostname}:80/audio-file/`;
   const sample_video = document.getElementById("sample_video");
   const video = document.getElementsByTagName("video")[0];
   const textTracks = _.get(video, "textTracks", null);
@@ -778,6 +780,27 @@ const Home = (props) => {
     return () => document.removeEventListener("pointerdown", onDown, true);
   }, []);
 
+  // Toàn trình duyệt: khoá cuộn trang và chặn vuốt, để không kéo xuống thấy thanh trình duyệt (Safari iPhone)
+  useEffect(() => {
+    if (!browserFull) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    const prevBg = document.body.style.background;
+    document.body.style.overflow = "hidden";
+    document.body.style.background = "#000";
+    // iPhone xoay ngang: viewport-fit=cover để video tràn cả hai bên (vùng an toàn), khôi phục khi thoát
+    const meta = document.querySelector('meta[name="viewport"]');
+    const prevViewport = meta ? meta.getAttribute("content") : null;
+    if (meta) meta.setAttribute("content", "width=device-width, initial-scale=1, viewport-fit=cover");
+    const stopScroll = (e) => e.preventDefault();
+    document.addEventListener("touchmove", stopScroll, { passive: false });
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.background = prevBg;
+      if (meta && prevViewport !== null) meta.setAttribute("content", prevViewport);
+      document.removeEventListener("touchmove", stopScroll);
+    };
+  }, [browserFull]);
+
   const onBackButtonEvent = (e) => {
     if (closePopupIfOpen()) {
       // Có popup: chỉ đóng popup, giữ trang xem và "bẫy" lần back tiếp theo
@@ -911,10 +934,7 @@ const Home = (props) => {
       .then((response) => response.json())
       .then((data) => {
         if (!Array.isArray(data)) return;
-        const defaultIndex = Math.max(
-          _.findIndex(data, (a) => a.default),
-          0
-        );
+        const defaultIndex = 0; // luôn mặc định audio đầu tiên, bỏ qua cờ default trong file
         setAudioList(data.map((a, i) => ({ label: a.label, isDefault: i === defaultIndex, enabled: i === defaultIndex })));
       })
       .catch(() => setAudioList([]));
@@ -931,6 +951,20 @@ const Home = (props) => {
     setMediaSrc(null);
   };
 
+  // Safari (iPhone/Mac) không phát được file .mkv gốc: dùng bản remux mp4 của audio mặc định
+  const isSafariBrowser = typeof navigator !== "undefined" && /safari/i.test(navigator.userAgent) && !/chrome|chromium|crios|android/i.test(navigator.userAgent);
+  const needRemux = isSafariBrowser && /\.mkv$/i.test(pathViewFile || "");
+
+  const autoRemuxFor = useRef(null);
+  useEffect(() => {
+    if (!needRemux || !audioList.length || mediaSrc) return;
+    if (autoRemuxFor.current === pathViewFile) return;
+    const d = audioList.findIndex((a) => a.isDefault);
+    if (d < 0) return;
+    autoRemuxFor.current = pathViewFile;
+    changeAudio(d);
+  }, [audioList, needRemux, mediaSrc, pathViewFile]);
+
   const clearPrepTimer = () => {
     clearInterval(prepTimerRef.current);
     prepTimerRef.current = null;
@@ -944,7 +978,7 @@ const Home = (props) => {
     const token = Date.now();
     audioTokenRef.current = token;
 
-    if (item.isDefault) {
+    if (item.isDefault && !needRemux) {
       // Audio gốc: quay về file gốc, giữ nguyên vị trí phát
       if (mediaSrc) {
         resumeAtRef.current = playerRef.current ? playerRef.current.getCurrentTime() || 0 : 0;
@@ -963,19 +997,26 @@ const Home = (props) => {
       showWaiting();
     }, 1000);
 
+    // audioOnlyFallback = true: ghép video + audio thất bại -> tách riêng audio đó ra (m4a) để nghe
+    let audioOnlyFallback = false;
+    const fmtQuery = needRemux ? "" : "&fmt=mkv"; // Chrome/Edge: giữ nguyên video + audio chọn, copy sang mkv (không mã hoá lại); Safari: mp4
     const poll = () => {
-      fetch(mediaPrepareURL + encodedPathViewFile() + `?track=${index}`)
+      const prepareURL = audioOnlyFallback ? audioPrepareURL : mediaPrepareURL;
+      fetch(prepareURL + encodedPathViewFile() + `?track=${index}${audioOnlyFallback ? "" : fmtQuery}`)
         .then((response) => response.json())
         .then((data) => {
           if (audioTokenRef.current !== token) return; // đã chọn audio khác
           if (data.ready) {
             clearPrepTimer();
             resumeAtRef.current = playerRef.current ? playerRef.current.getCurrentTime() || 0 : 0;
-            setMediaSrc(mediaURL + encodedPathViewFile() + `?track=${index}`);
+            setMediaSrc((audioOnlyFallback ? audioFileURL : mediaURL) + encodedPathViewFile() + `?track=${index}${audioOnlyFallback ? "" : fmtQuery}`);
             markAudioEnabled(index);
-            showToast(`Audio: ${item.label}`);
+            showToast(audioOnlyFallback ? `Audio: ${item.label} (chỉ có tiếng, không có hình)` : `Audio: ${item.label}`, audioOnlyFallback ? 4000 : undefined);
           } else if (data.waiting) {
             setTimeout(poll, 1500);
+          } else if (!audioOnlyFallback) {
+            audioOnlyFallback = true; // không ghép được với video: tách riêng audio ra
+            setTimeout(poll, 0);
           } else {
             clearPrepTimer();
             audioTargetRef.current = null;
@@ -1703,12 +1744,24 @@ const Home = (props) => {
       if (audioOnly) setAudioOnly(false); // bấm full screen khi đang chỉ nghe: hiện lại video
       // Cảm ứng: full screen cả khối (video + khung sub) để mở được khung sub bên cạnh
       const fsTarget = touch && stackRef.current ? stackRef.current : sample_video;
-      fsTarget.requestFullscreen();
-    } else if (touch) {
-      // Khoá dọc trước khi thoát (trình duyệt chỉ cho khoá khi còn đang full)
-      lockOrient("portrait").then(() => document.exitFullscreen());
+      // iPhone Safari không phóng to được khối: dùng chế độ "Toàn trình duyệt" (giữ nguyên sub và các nút)
+      const cssFull = () => setBrowserFull(true);
+      if (!fsTarget || !fsTarget.requestFullscreen) return cssFull();
+      const req = fsTarget.requestFullscreen();
+      if (req && req.catch) req.catch(cssFull);
     } else {
-      document.exitFullscreen();
+      setBrowserFull(false);
+      const exitFs = () => {
+        const videoEl = document.getElementsByTagName("video")[0];
+        if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+        else if (videoEl && videoEl.webkitExitFullscreen) videoEl.webkitExitFullscreen();
+      };
+      if (touch) {
+        // Khoá dọc trước khi thoát (trình duyệt chỉ cho khoá khi còn đang full); iOS không khoá được thì vẫn thoát
+        Promise.resolve(lockOrient("portrait")).catch(() => {}).then(exitFs);
+      } else {
+        exitFs();
+      }
     }
   };
 
@@ -2162,6 +2215,9 @@ const Home = (props) => {
     if (!isMouse) return;
     // Chạm 2 lần ở hai bên = tua 2 lần, không bật/tắt full screen
     if (touch && tapZoneOf(e) !== "center") return;
+    // Cảm ứng: chạm đôi giữa màn hình không bật full screen (dễ bị kích hoạt nhầm khi bấm play).
+    // Muốn full screen thì bấm nút phóng to.
+    if (touch) return;
     handleFullSreen(!isFullSreen);
   };
 
@@ -2516,6 +2572,8 @@ const Home = (props) => {
                             crossOrigin: "anonymous"
                           },
                           file: {
+                            // playsinline: iPhone phát ngay trong khung app thay vì ép sang trình phát gốc toàn màn hình
+                            attributes: { playsInline: true, "webkit-playsinline": "true" },
                             tracks: subtitles.map((sub, index) => ({
                               kind: "subtitles",
                               src: subtitlesURL + pathViewFile + `?language=${sub.language}`,
@@ -3006,7 +3064,7 @@ const Home = (props) => {
                         <BarButton
                           name="v-fullscreen"
                           id="play_12"
-                          onClick={() => handleFullSreen(!isFullSreen)}
+                          onClick={() => handleFullSreen(!(isFullSreen || browserFull))}
                           extra={isFullSreen ? "v-exit" : ""}
                           icon={
                             <>
