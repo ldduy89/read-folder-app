@@ -219,9 +219,13 @@ function useStoreValue(store) {
 
 const EMPTY_CUES = [];
 // Component hiển thị sub: tự đăng ký cue từ store, nên đổi cue chỉ render lại chính nó.
-const SubtitleLayer = React.memo(function SubtitleLayer({ meta, rect, secondaryOn, controlsHidden, saved, hover, onGrab, onWord, getTime }) {
-  const cues = useStoreValue(cueStore);
-  const cues2 = useStoreValue(cueStore2);
+// Cue có toạ độ (\\pos / \\move) trong nội dung: hiển thị theo toạ độ, không đi kiểu trượt
+const hasPosCue = (c) => /\\(pos|move)\s*\(/.test((c && c.text) || "");
+const SubtitleLayer = React.memo(function SubtitleLayer({ meta, rect, secondaryOn, controlsHidden, posMode, saved, hover, onGrab, onWord, getTime }) {
+  // posMode "only": chỉ vẽ các cue có toạ độ (phần còn lại do kiểu trượt lo)
+  const keep = (list) => (posMode === "only" ? list.filter(hasPosCue) : list);
+  const cues = keep(useStoreValue(cueStore));
+  const cues2 = keep(useStoreValue(cueStore2));
   return (
     buildAssLayer(cues, meta, rect, {
       secondary: secondaryOn ? cues2 : EMPTY_CUES,
@@ -268,6 +272,7 @@ const SlideSubtitleLayer = React.memo(function SlideSubtitleLayer({ rect, lang, 
         const started = [];
         const entering = [];
         Array.from(track.cues).forEach((c) => {
+          if (hasPosCue(c)) return; // cue có toạ độ do kiểu thường vẽ
           if (c.startTime <= t) started.push(c);
           else if (c.startTime - SLIDE_LEAD <= t) entering.push(c);
         });
@@ -2524,12 +2529,13 @@ const Home = (props) => {
                     )}
 
                     {!audioOnly && subStyle === "slide" && <SlideSubtitleLayer rect={picRect} lang={activeSubLang} secondary={secLang} controlsHidden={controlsHidden} saved={savedMatcher} hover={isMouse && !touch} onWord={wordStable} />}
-                    {!audioOnly && subStyle !== "slide" && (
+                    {!audioOnly && (
                       <SubtitleLayer
                         meta={assMeta}
                         rect={picRect}
                         secondaryOn={!!secLang}
                         controlsHidden={controlsHidden}
+                        posMode={subStyle === "slide" ? "only" : undefined}
                         saved={savedMatcher}
                         hover={isMouse && !touch}
                         onGrab={grabStable}
